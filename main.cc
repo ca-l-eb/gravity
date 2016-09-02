@@ -36,7 +36,7 @@ static void save_PBodies(PBodies& b, std::string filename) {
 
 static void doPhysics(PBodies* b, float dt, bool* updated, bool* running) {
     while (true) {
-        b->applyGravity2(dt);
+        b->applyGravity(dt);
         std::lock_guard<std::mutex> guard(mu);
 		*updated = true; // Instance data needs updating... (in main thread)
         if (! *running) {

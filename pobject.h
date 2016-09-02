@@ -9,7 +9,6 @@ public:
     ~PBodies();
 	inline int size() { return count; }
 	void applyGravity(float dt);
-	void applyGravity2(float dt);
 	void printBody(int index);
 
 	glm::vec3 *pos, *vel, *acc, *color;
