@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(gravity)
 
 #set(CMAKE_VERBOSE_MAKEFILE on)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
 if(WIN32)
@@ -28,6 +28,11 @@ find_package(SDL2 REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm REQUIRED)
 find_package(Threads REQUIRED)
+
+if(UNIX AND NOT APPLE)
+    set(OpenCL_LIBRARY /usr/lib/x86_64-linux-gnu/libOpenCL.so.1.0.0)
+#    find_package(MESA REQUIRED)
+endif()
 find_package(OpenCL REQUIRED)
 
 
@@ -35,7 +40,7 @@ find_package(OpenCL REQUIRED)
 
 set(RESOURCES_DIRECTORY res)
 set(SOURCE_FILES main.cc display.cc display.h pobject.cc pobject.h shader.cc shader.h simpleio.cc simpleio.h)
-set(SOURCE_FILES_CL opencl.cc simpleio.cc simpleio.h)
+set(SOURCE_FILES_CL opencl.cc simpleio.cc simpleio.h opencl.h display.cc display.h)
 file(COPY ${RESOURCES_DIRECTORY} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 add_executable(gravity ${SOURCE_FILES})
@@ -43,4 +48,4 @@ add_executable(gravity_cl ${SOURCE_FILES_CL})
 
 # Link the libraries to the executable
 target_link_libraries(gravity ${SDL2_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES} ${CMAKE_THREAD_LIB_INIT})
-target_link_libraries(gravity_cl ${OpenCL_LIBRARIES})
+target_link_libraries(gravity_cl ${OpenCL_LIBRARIES} ${SDL2_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
