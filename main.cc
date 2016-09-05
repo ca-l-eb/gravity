@@ -49,7 +49,7 @@ static void doPhysics(PBodies* b, float dt, bool* updated, bool* running) {
 int main(int argc, char* argv[]) {
     int width = 1600;
     int height = 900;
-    Display disp(width, height, "Hello, world!");
+    GLDisplay disp(width, height, "Hello, world!");
     if (disp.wasError()) {
         return disp.wasError();
     }
