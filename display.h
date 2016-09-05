@@ -3,11 +3,11 @@
 
 #include <SDL2/SDL.h>
 
-class Display {
+class GLDisplay {
 
 public:
-    Display(int width, int height, const char* title);
-    ~Display();
+    GLDisplay(int width, int height, const char* title);
+    ~GLDisplay();
 	inline int getWidth() { return width; }
 	inline int getHeight() { return height; }
 	inline int wasError() { return error; }

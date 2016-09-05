@@ -18,7 +18,7 @@
 #include "display.h"
 
 
-Display::Display(int width, int height, const char* title) {
+GLDisplay::GLDisplay(int width, int height, const char* title) {
     // Initialize SDL video
     SDL_Init(SDL_INIT_VIDEO);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -65,21 +65,21 @@ Display::Display(int width, int height, const char* title) {
     resized = false;
 }
 
-Display::~Display() {
+GLDisplay::~GLDisplay() {
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();
 }
 
 // Clear the display to the specified color
-void Display::clear(float r, float g, float b, float a) {
+void GLDisplay::clear(float r, float g, float b, float a) {
     if (clearEnabled) {
         glClearColor(r, g, b, a);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 }
 
-bool Display::wasResized() {
+bool GLDisplay::wasResized() {
     if (resized) {
         resized = false;
         return true;
@@ -87,7 +87,7 @@ bool Display::wasResized() {
     return false;
 }
 
-void Display::update() {
+void GLDisplay::update() {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) {
