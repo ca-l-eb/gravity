@@ -19,7 +19,7 @@
 static GLuint setup_shader(const char* source, GLint type);
 static void check_shader_errors(GLuint shader, GLuint flag);
 
-Shader::Shader(const char* vertexFile, const char* fragFile) {
+GLShader::GLShader(const char* vertexFile, const char* fragFile) {
     program = glCreateProgram();
 
     const char* vertexSource = read_file(vertexFile);
@@ -43,7 +43,7 @@ Shader::Shader(const char* vertexFile, const char* fragFile) {
     check_shader_errors(program, GL_LINK_STATUS);
 }
 
-Shader::~Shader() {
+GLShader::~GLShader() {
     for (unsigned int i = 0; i < NUM_SHADERS; i++ ) {
         glDetachShader(program, shaders[i]);
         glDeleteShader(shaders[i]);
@@ -51,19 +51,19 @@ Shader::~Shader() {
     glDeleteProgram(program);
 }
 
-GLuint Shader::getProgram() {
+GLuint GLShader::getProgram() {
     return program;
 }
 
-GLint Shader::getAttribLocation(const char *attribute) {
+GLint GLShader::getAttribLocation(const char *attribute) {
     return glGetAttribLocation(program, attribute);
 }
 
-GLint Shader::getUniformLocation(const char* uniform) {
+GLint GLShader::getUniformLocation(const char* uniform) {
     return glGetUniformLocation(program, uniform);
 }
 
-void Shader::use() {
+void GLShader::use() {
     glUseProgram(program);
 }
 

@@ -11,11 +11,11 @@
 #include <OpenGL/gl.h>
 #endif
 
-class Shader {
+class GLShader {
 
 public:
-    Shader(const char* vertexFile, const char* fragFile);
-    ~Shader();
+	GLShader(const char* vertexFile, const char* fragFile);
+    ~GLShader();
     GLint getAttribLocation(const char* attribute);
     GLint getUniformLocation(const char* uniform);
     GLuint getProgram();
