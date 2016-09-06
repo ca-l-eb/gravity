@@ -4,7 +4,7 @@ __kernel void apply_gravity(__global float* pos,
                             __global float* mass,
                             __global int* size) {
     int id = get_global_id(0);
-    int loc = id * sizeof(float) * 3;
+    int loc = id * 3;
 
     float px = pos[loc];
     float py = pos[loc + 1];
@@ -42,7 +42,7 @@ __kernel void update_positions(__global float* pos,
     float t = dt[0];
 
     // We need to know how far apart each component is... data is glm::vec3 format on the GPU
-    int loc = id * sizeof(float) * 3;
+    int loc = id * 3;
     float gaxdt = G_CONSTANT * acc[loc]     * t;
     float gaydt = G_CONSTANT * acc[loc + 1] * t;
     float gazdt = G_CONSTANT * acc[loc + 2] * t;
