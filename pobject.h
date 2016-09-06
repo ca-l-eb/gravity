@@ -13,8 +13,7 @@ public:
 
 	glm::vec3 *pos, *vel, *acc, *color;
 	float *mass, *radii;
-private:
-    int count;
+	int count;
 };
 
 #endif

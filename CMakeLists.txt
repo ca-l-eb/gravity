@@ -40,7 +40,7 @@ find_package(OpenCL REQUIRED)
 
 set(RESOURCES_DIRECTORY res)
 set(SOURCE_FILES main.cc display.cc display.h pobject.cc pobject.h shader.cc shader.h simpleio.cc simpleio.h)
-set(SOURCE_FILES_CL opencl.cc simpleio.cc simpleio.h opencl.h display.cc display.h physics_gl.cc physics_gl.h shader.cc shader.h pobject.cc pobject.h)
+set(SOURCE_FILES_CL physics_cl.cc simpleio.cc simpleio.h physics_cl.h display.cc display.h physics_gl.cc physics_gl.h shader.cc shader.h pobject.cc pobject.h)
 file(COPY ${RESOURCES_DIRECTORY} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 add_executable(gravity ${SOURCE_FILES})

@@ -34,7 +34,7 @@
 #include <ctime>
 
 #include "simpleio.h"
-#include "opencl.h"
+#include "physics_cl.h"
 #include "physics_gl.h"
 
 

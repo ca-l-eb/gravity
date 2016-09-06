@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
     printf("OpenGL version: %s\n", glGetString(GL_VERSION));
 
     float dt = 0.00005f; // Time step in seconds
-    int count = 1 << 10; // Number of particles
+    int count = 1 << 11; // Number of particles
     float step = float(M_PI / 300.0f); // Camera rotation in radians
     handle_args(argc, argv, count, dt, step);
 
@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
     PBodies b(count);
     init_PBodies(b); // Generate random locations for the particles
 
-    Shader simpleShader("res/simple_mesh.vs", "res/simple_mesh.fs");
+    GLShader simpleShader("res/simple_mesh.vs", "res/simple_mesh.fs");
     simpleShader.use();
 
     // Time to link vertex data with the corresponding vertex attribute in the vertex shader
