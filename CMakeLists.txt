@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(gravity)
 
 #set(CMAKE_VERBOSE_MAKEFILE on)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11  -O3 -g")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
 if(WIN32)
@@ -40,7 +40,7 @@ find_package(OpenCL REQUIRED)
 
 set(RESOURCES_DIRECTORY res)
 set(SOURCE_FILES main.cc display.cc display.h pobject.cc pobject.h shader.cc shader.h simpleio.cc simpleio.h)
-set(SOURCE_FILES_CL opencl.cc simpleio.cc simpleio.h opencl.h display.cc display.h)
+set(SOURCE_FILES_CL opencl.cc simpleio.cc simpleio.h opencl.h display.cc display.h physics_gl.cc physics_gl.h shader.cc shader.h pobject.cc pobject.h)
 file(COPY ${RESOURCES_DIRECTORY} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 add_executable(gravity ${SOURCE_FILES})
