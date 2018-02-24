@@ -2,17 +2,14 @@
 // Created by Caleb Dechant on 9/5/16.
 //
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <random>
 
 #include "physics_gl.h"
 
-// Call other constructor if given no parameters
-physics_gl::physics_gl() : physics_gl(640, 480, DEFAULT_BODIES_COUNT, DEFAULT_STEP_DT) {}
-
-physics_gl::physics_gl(int width, int height, int num_bodies, float dt)
-    : disp(width, height, "Gravity Physics GL")
-    , shader("res/simple_mesh.vs", "res/simple_mesh.fs")
-    , bodies(num_bodies)
+physics_gl::physics_gl(int num_bodies, float dt)
+    : shader("res/simple_mesh.vs", "res/simple_mesh.fs"), bodies(num_bodies)
 {
     num_particles = num_bodies;
     init_bodies();
@@ -30,6 +27,27 @@ physics_gl::physics_gl(int width, int height, int num_bodies, float dt)
 physics_gl::~physics_gl()
 {
     // TODO: Delete OpenGL data
+}
+
+void physics_gl::use_shader()
+{
+    shader.use();
+}
+
+void physics_gl::bind()
+{
+    glBindVertexArray(vao);
+}
+
+void physics_gl::set_view(const glm::mat4 &view)
+{
+    glUniformMatrix4fv(view_uniform, 1, GL_FALSE, glm::value_ptr(view));
+}
+
+void physics_gl::set_perspective(float aspect_ratio, float near, float far)
+{
+    perspective_matrix = glm::perspective(80.0f, aspect_ratio, near, far);
+    glUniformMatrix4fv(project_uniform, 1, GL_FALSE, glm::value_ptr(perspective_matrix));
 }
 
 void physics_gl::make_gl_buffers()
@@ -117,4 +135,10 @@ void physics_gl::init_bodies()
     bodies.pos[count - 1] = {0.0f, 0.0f, 0.0f};
     bodies.mass[count - 1] = 5e14f;
     bodies.color[count - 1] = {1.0f, 1.0f, 1.0f};
+}
+
+void physics_gl::update_positions()
+{
+    glBindBuffer(GL_ARRAY_BUFFER, positions_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, num_particles * sizeof(glm::vec3), bodies.pos.data());
 }

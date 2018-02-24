@@ -1,5 +1,5 @@
 #include <GL/glew.h>
-#include <utility>
+
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
 #include <OpenCL/cl_ext.h>
@@ -20,9 +20,7 @@
 #endif
 #endif
 
-#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include <math.h>
 #include <string.h>
@@ -31,6 +29,7 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
+#include <utility>
 #include <vector>
 
 #include "physics_cl.h"
@@ -46,14 +45,13 @@ static int check_error(cl_int err, const char *message)
     return 0;
 }
 
-physics_cl::physics_cl(physics_gl *p)
+physics_cl::physics_cl(physics_gl &p) : pgl{p}
 {
-    pgl = p;
     platform = get_platform();
-    gpu_device = get_best_device();
+    device = get_best_device();
 
     std::cout << "Best device: ";
-    print_device_name(gpu_device);
+    print_device_name(device);
 
     context = get_context();
     queue = get_command_queue();
@@ -69,7 +67,7 @@ physics_cl::physics_cl(physics_gl *p)
 
     make_buffers();
 
-    global_dimensions[0] = p->num_particles;
+    global_dimensions[0] = p.num_particles;
     global_dimensions[1] = 0;
     global_dimensions[2] = 0;
 }
@@ -89,19 +87,19 @@ physics_cl::~physics_cl()
 
 void physics_cl::make_buffers()
 {
-    auto size = pgl->num_particles;
+    auto size = pgl.num_particles;
     auto error = 0;
     auto vec_size = sizeof(glm::vec3) * size;
     // Map the OpenGL VBO memory to this OpenCL context if it is a GL context
     if (gl_context) {
-        input_pos = clCreateFromGLBuffer(context, CL_MEM_READ_ONLY, pgl->positions_vbo, &error);
+        input_pos = clCreateFromGLBuffer(context, CL_MEM_READ_ONLY, pgl.positions_vbo, &error);
         std::cout << "Using OpenGL buffer" << std::endl;
         check_error(error, "clCreateFromGLBuffer");
     } else {
         // Need to update these positions each frame if its not shared by OpenGL
         input_pos = clCreateBuffer(context, CL_MEM_READ_ONLY, vec_size, nullptr, &error);
         check_error(error, "clCreateBuffer");
-        clEnqueueWriteBuffer(queue, input_pos, CL_FALSE, 0, vec_size, pgl->bodies.pos.data(), 0,
+        clEnqueueWriteBuffer(queue, input_pos, CL_FALSE, 0, vec_size, pgl.bodies.pos.data(), 0,
                              nullptr, nullptr);
     }
 
@@ -114,16 +112,16 @@ void physics_cl::make_buffers()
     input_dt = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float), nullptr, &error);
     check_error(error, "clCreateBuffers input_dt");
 
-    error = clEnqueueWriteBuffer(queue, input_vel, CL_FALSE, 0, vec_size, pgl->bodies.vel.data(), 0,
+    error = clEnqueueWriteBuffer(queue, input_vel, CL_FALSE, 0, vec_size, pgl.bodies.vel.data(), 0,
                                  nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_vel");
-    error = clEnqueueWriteBuffer(queue, input_acc, CL_FALSE, 0, vec_size, pgl->bodies.acc.data(), 0,
+    error = clEnqueueWriteBuffer(queue, input_acc, CL_FALSE, 0, vec_size, pgl.bodies.acc.data(), 0,
                                  nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_acc");
     error = clEnqueueWriteBuffer(queue, input_mass, CL_FALSE, 0, size * sizeof(float),
-                                 pgl->bodies.mass.data(), 0, nullptr, nullptr);
+                                 pgl.bodies.mass.data(), 0, nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_mass");
-    error = clEnqueueWriteBuffer(queue, input_dt, CL_FALSE, 0, sizeof(float), &pgl->step_dt, 0,
+    error = clEnqueueWriteBuffer(queue, input_dt, CL_FALSE, 0, sizeof(float), &pgl.step_dt, 0,
                                  nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_dt");
     clFinish(queue);
@@ -145,18 +143,18 @@ cl_platform_id physics_cl::get_platform()
     return platformIds[0];
 }
 
-cl_context physics_cl::get_context()
-{
 // Help from: http://sa10.idav.ucdavis.edu/docs/sa10-dg-opencl-gl-interop.pdf
 // Create CL context properties, add handle & share-group enum
+static cl_context_properties *get_shared_gl_properties(cl_platform_id platform)
+{
 #ifdef __APPLE__
     // Get current CGL Context and CGL Share group
     auto kCGLContext = CGLGetCurrentContext();
     auto kCGLShareGroup = CGLGetShareGroup(kCGLContext);
-    auto properties[] = {CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
-                         (cl_context_properties) kCGLShareGroup, 0};
+    static cl_context_properties properties[] = {CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
+                                                 (cl_context_properties) kCGLShareGroup, 0};
 #elif _WIN32
-    cl_context_properties properties[] = {
+    static cl_context_properties properties[] = {
         CL_GL_CONTEXT_KHR,
         (cl_context_properties) wglGetCurrentContext(),  // WGL Context
         CL_WGL_HDC_KHR,
@@ -165,7 +163,7 @@ cl_context physics_cl::get_context()
         (cl_context_properties) platform,
         0};
 #else
-    cl_context_properties properties[] = {
+    static cl_context_properties properties[] = {
         CL_GL_CONTEXT_KHR,
         (cl_context_properties) glXGetCurrentContext(),  // GLX Context
         CL_GLX_DISPLAY_KHR,
@@ -174,39 +172,28 @@ cl_context physics_cl::get_context()
         (cl_context_properties) platform,  // OpenCL platform
         0};
 #endif
-    cl_context context = 0;
-    auto error = 0;
+    return properties;
+}
 
-#ifdef __APPLE__
-    context = clCreateContext(properties, 1, &gpu_device, nullptr, nullptr, &error);
-    if (!error) {
+cl_context physics_cl::get_context()
+{
+    auto properties = get_shared_gl_properties(platform);
+    auto error = 0;
+    auto context = clCreateContext(properties, 1, &device, nullptr, nullptr, &error);
+    if (!check_error(error, "clCreateContext OpenGL")) {
         gl_context = true;
         return context;
     } else {
-        context = clCreateContext(0, 1, &gpu_device, nullptr, nullptr, &error);
-        check_error(error, "clCreateContext normal context");
+        context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &error);
+        check_error(error, "clCreateContext");
         return context;
     }
-#else
-#endif
-    if (!error) {
-        // Create an OpenGL/OpenCL context for this GPU device
-        context = clCreateContext(properties, 1, &gpu_device, nullptr, nullptr, &error);
-        if (!check_error(error, "clCreateContext OpenGL")) {
-            return context;
-        }
-        std::cerr << "Could not create OpenGL context for OpenCL" << std::endl;
-    }
-    context = clCreateContext(0, 1, &gpu_device, nullptr, nullptr, &error);
-    check_error(error, "clCreateContext normal context");
-    return context;
 }
 
 cl_command_queue physics_cl::get_command_queue()
 {
-    // Create a command queue for our device
     auto error = 0;
-    auto ret = clCreateCommandQueueWithProperties(context, gpu_device, nullptr, &error);
+    auto ret = clCreateCommandQueueWithProperties(context, device, nullptr, &error);
     if (error)
         check_error(error, "clCreateCommandQueueWithProperties");
     return ret;
@@ -217,22 +204,20 @@ cl_program physics_cl::make_program(const char *kernel_source)
     auto error = 0;
     auto program = clCreateProgramWithSource(context, 1, &kernel_source, nullptr, nullptr);
 
-    // Compile the kernel with all our devices
     error = clBuildProgram(program, 0, nullptr, nullptr, nullptr, nullptr);
+    check_build_errors(error, program, device);
 
-    // Check errors building the kernel
-    check_build_errors(error, program, gpu_device);
     return program;
 }
 
 cl_device_id physics_cl::get_best_device()
 {
-    auto device_count = 0U;
     auto max_compute_units = 0L;
     cl_device_id best_device;
 
-    // Get all devices for the platform
+    auto device_count = 0U;
     clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
+
     std::vector<cl_device_id> devices(device_count);
     clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, device_count, devices.data(), nullptr);
 
@@ -279,13 +264,13 @@ std::string physics_cl::get_device_extensions(cl_device_id id)
     return str;
 }
 
-int physics_cl::is_extension_supported(const char *extension_name, cl_device_id id)
+bool physics_cl::is_extension_supported(const char *extension_name, cl_device_id id)
 {
     auto extensions = get_device_extensions(id);
     if (extensions.find(extension_name, 0) != std::string::npos) {
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 int physics_cl::cl_gl_compatibility(cl_device_id id)
@@ -393,6 +378,31 @@ void physics_cl::print_platform_info()
     }
 }
 
+void physics_cl::acquire_gl_object()
+{
+    glFlush();
+    auto err = clEnqueueAcquireGLObjects(queue, 1, &input_pos, 0, nullptr, nullptr);
+    check_error(err, "clEnqueueAcquireGLObjects");
+}
+
+void physics_cl::release_gl_object()
+{
+    auto err = clEnqueueReleaseGLObjects(queue, 1, &input_pos, 0, nullptr, nullptr);
+    check_error(err, "releasing GL objects");
+}
+
+void physics_cl::finish()
+{
+    clFinish(queue);
+}
+
+void physics_cl::write_position_data()
+{
+    auto bytes = pgl.num_particles * sizeof(glm::vec3);
+    auto data = pgl.bodies.pos.data();
+    clEnqueueReadBuffer(queue, input_pos, CL_TRUE, 0, bytes, data, 0, nullptr, nullptr);
+}
+
 static void handle_args(int argc, char *argv[], int &count, float &dt, float &step)
 {
     if (argc > 1) {
@@ -411,28 +421,28 @@ static void handle_args(int argc, char *argv[], int &count, float &dt, float &st
 
 int main(int argc, char *argv[])
 {
+    auto display = GLDisplay{1600, 900, "Gravity OpenCL"};
+    if (display.wasError()) {
+        return display.wasError();
+    }
+    printf("OpenGL version: %s\n", glGetString(GL_VERSION));
+
     auto count = 1 << 12;
     auto dt = 0.0005f;
     auto step = float(M_PI / 300.0f) / 15.0f;
     handle_args(argc, argv, count, dt, step);
 
-    physics_gl p(1600, 900, count, dt);
-    if (p.disp.wasError()) {
-        return p.disp.wasError();
-    }
+    physics_gl pgl{count, dt};
 
-    printf("OpenGL version: %s\n", glGetString(GL_VERSION));
-
-    auto c = physics_cl{&p};
+    auto c = physics_cl{pgl};
     c.print_platform_info();
 
     // Bind shader and use VAO so OpenGL draws correctly
-    p.shader.use();
-    glBindVertexArray(p.vao);
+    pgl.use_shader();
+    pgl.bind();
 
-    auto aspect_ratio = (float) p.disp.getWidth() / p.disp.getHeight();
-    p.perspective_matrix = glm::perspective(80.0f, aspect_ratio, 0.1f, 100.0f);
-    glUniformMatrix4fv(p.project_uniform, 1, GL_FALSE, glm::value_ptr(p.perspective_matrix));
+    auto aspect_ratio = (float) display.getWidth() / display.getHeight();
+    pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
 
     auto camera_target = glm::vec3(0.0f, 0.0f, 0.0f);
     auto up = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -443,47 +453,37 @@ int main(int argc, char *argv[])
         glm::lookAt(glm::vec3(2 * sin(counter), 1.1f * sin(1.3 * counter) * cos(.33f * counter),
                               2 * cos(counter)),
                     camera_target, up);
-    glUniformMatrix4fv(p.view_uniform, 1, GL_FALSE, glm::value_ptr(view));
+    pgl.set_view(view);
+    pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
 
     glEnable(GL_DEPTH_TEST);
     glPointSize(1);
 
-    while (!p.disp.isClosed()) {
-        p.disp.clear(0.0f, 0.0f, 0.0f, 1.0f);
-        if (p.disp.wasResized()) {
-            aspect_ratio = (float) p.disp.getWidth() / p.disp.getHeight();
-            p.perspective_matrix = glm::perspective(80.0f, aspect_ratio, 0.1f, 100.0f);
-            glUniformMatrix4fv(p.project_uniform, 1, GL_FALSE,
-                               glm::value_ptr(p.perspective_matrix));
-            glViewport(0, 0, p.disp.getWidth(), p.disp.getHeight());
+    while (!display.isClosed()) {
+        display.clear(0.0f, 0.0f, 0.0f, 1.0f);
+        if (display.wasResized()) {
+            aspect_ratio = (float) display.getWidth() / display.getHeight();
+            pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
+            glViewport(0, 0, display.getWidth(), display.getHeight());
         }
         if (c.is_gl_context()) {
-            // Acquire shared objects
-            glFlush();
-            auto err = clEnqueueAcquireGLObjects(c.queue, 1, &c.input_pos, 0, nullptr, nullptr);
-            check_error(err, "clEnqueueAcquireGLObjects");
+            c.acquire_gl_object();
 
             // Update the positions while OpenCL has acquired the OpenGL buffers
             c.apply_gravity();
             c.update_positions();
 
-            // Release shared objects
-            err = clEnqueueReleaseGLObjects(c.queue, 1, &c.input_pos, 0, nullptr, nullptr);
-            check_error(err, "releasing GL objects");
-            clFinish(c.queue);
+            c.release_gl_object();
         } else {
             // Else context is not OpenGL shared buffer, we need to read the data back, then write
             // it back to OpenGL to display the updated positions of the particles
             c.apply_gravity();
             c.update_positions();
-            clEnqueueReadBuffer(c.queue, c.input_pos, CL_TRUE, 0,
-                                p.num_particles * sizeof(glm::vec3), p.bodies.pos.data(), 0,
-                                nullptr, nullptr);
-            clFinish(c.queue);
-            glBindBuffer(GL_ARRAY_BUFFER, p.positions_vbo);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, p.num_particles * sizeof(glm::vec3),
-                            (GLvoid *) p.bodies.pos.data());
+            c.write_position_data();
+
+            pgl.update_positions();
         }
+        c.finish();
 
         // Update the camera
         counter += step;
@@ -491,11 +491,11 @@ int main(int argc, char *argv[])
             glm::lookAt(glm::vec3(2 * sin(counter), 1.1f * sin(1.3 * counter) * cos(.33f * counter),
                                   2 * cos(counter)),
                         camera_target, up);
-        glUniformMatrix4fv(p.view_uniform, 1, GL_FALSE, glm::value_ptr(view));
+        pgl.set_view(view);
 
         // Finally, draw the particles to the screen, and update
         glDrawArraysInstanced(GL_POINTS, 0, 3 * sizeof(glm::vec3), count);
-        p.disp.update();
+        display.update();
     }
     return 0;
 }
