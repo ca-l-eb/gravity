@@ -17,8 +17,8 @@
 
 #include "display.h"
 
-
-GLDisplay::GLDisplay(int width, int height, const char* title) {
+GLDisplay::GLDisplay(int width, int height, const char *title)
+{
     // Initialize SDL video
     SDL_Init(SDL_INIT_VIDEO);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -35,14 +35,14 @@ GLDisplay::GLDisplay(int width, int height, const char* title) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     // Create the window, centered
-    window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED,
-                SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height,
+                              SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (window == NULL) {
         std::cerr << "Could not create a window!" << std::endl;
         error = 1;
     }
-	this->width = width;
-	this->height = height;
+    this->width = width;
+    this->height = height;
 
     // Get an OpenGL context to work with
     glContext = SDL_GL_CreateContext(window);
@@ -65,21 +65,24 @@ GLDisplay::GLDisplay(int width, int height, const char* title) {
     resized = false;
 }
 
-GLDisplay::~GLDisplay() {
+GLDisplay::~GLDisplay()
+{
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();
 }
 
 // Clear the display to the specified color
-void GLDisplay::clear(float r, float g, float b, float a) {
+void GLDisplay::clear(float r, float g, float b, float a)
+{
     if (clearEnabled) {
         glClearColor(r, g, b, a);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 }
 
-bool GLDisplay::wasResized() {
+bool GLDisplay::wasResized()
+{
     if (resized) {
         resized = false;
         return true;
@@ -87,29 +90,27 @@ bool GLDisplay::wasResized() {
     return false;
 }
 
-void GLDisplay::update() {
+void GLDisplay::update()
+{
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) {
             closed = true;
-        }
-        else if (e.type == SDL_KEYDOWN) {
+        } else if (e.type == SDL_KEYDOWN) {
             auto keyPressed = e.key.keysym.sym;
             if (keyPressed == SDLK_UP) {
                 clearEnabled = !clearEnabled;
             }
             if (keyPressed == SDLK_F11) {
-				// Todo: change resolution to fit native monitor if not already
+                // Todo: change resolution to fit native monitor if not already
                 fullscreen = !fullscreen;
                 if (fullscreen) {
                     SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
-                }
-                else {
+                } else {
                     SDL_SetWindowFullscreen(window, 0);
                 }
             }
-        }
-        else if (e.type == SDL_WINDOWEVENT) {
+        } else if (e.type == SDL_WINDOWEVENT) {
             if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
                 width = e.window.data1;
                 height = e.window.data2;

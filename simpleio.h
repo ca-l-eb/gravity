@@ -5,6 +5,6 @@
 #ifndef GRAVITY_SIMPLEIO_H
 #define GRAVITY_SIMPLEIO_H
 
-char* read_file(const char* filename);
+char *read_file(const char *filename);
 
-#endif //GRAVITY_SIMPLEIO_H
+#endif  // GRAVITY_SIMPLEIO_H

@@ -1,19 +1,18 @@
 __kernel void apply_gravity(__global float* pos,
                             __global float* vel,
                             __global float* acc,
-                            __global float* mass,
-                            __global int* size) {
+                            __global float* mass) {
     int id = get_global_id(0);
     int loc = id * 3;
 
     float px = pos[loc];
     float py = pos[loc + 1];
     float pz = pos[loc + 2];
-    int n = size[0];
+    int n = get_global_size(0);
 
     float EPS = 1e-6f;
     for (int j = 0; j < n; j++) {
-        int loc_j = j * sizeof(float) * 3;
+        int loc_j = j * 3;
         float dx = pos[loc_j]     - px;
         float dy = pos[loc_j + 1] - py;
         float dz = pos[loc_j + 2] - pz;

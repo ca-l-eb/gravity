@@ -2,18 +2,22 @@
 #define POBJECT_HH
 
 #include <glm/glm.hpp>
+#include <vector>
 
-class PBodies {
+class PBodies
+{
 public:
     PBodies(int size);
-    ~PBodies();
-	inline int size() { return count; }
-	void applyGravity(float dt);
-	void printBody(int index);
+    inline int size()
+    {
+        return count;
+    }
+    void applyGravity(float dt);
+    void printBody(int index);
 
-	glm::vec3 *pos, *vel, *acc, *color;
-	float *mass, *radii;
-	int count;
+    std::vector<glm::vec3> pos, vel, acc, color;
+    std::vector<float> mass;
+    int count;
 };
 
 #endif

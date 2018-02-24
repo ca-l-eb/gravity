@@ -11,13 +11,13 @@
 #include <OpenGL/gl.h>
 #endif
 
-class GLShader {
-
+class GLShader
+{
 public:
-	GLShader(const char* vertexFile, const char* fragFile);
+    GLShader(const char *vertexFile, const char *fragFile);
     ~GLShader();
-    GLint getAttribLocation(const char* attribute);
-    GLint getUniformLocation(const char* uniform);
+    GLint getAttribLocation(const char *attribute);
+    GLint getUniformLocation(const char *uniform);
     GLuint getProgram();
     void use();
 
@@ -27,5 +27,4 @@ private:
     GLuint shaders[NUM_SHADERS];
 };
 
-
-#endif //GRAVITY_SHADER_H
+#endif  // GRAVITY_SHADER_H

@@ -11,29 +11,27 @@
 #include <mutex>
 
 #include "display.h"
-#include "shader.h"
 #include "pobject.h"
+#include "shader.h"
 
-
-
-class physics_gl {
+class physics_gl
+{
 public:
     physics_gl();
     physics_gl(int width, int height, int num_bodies, float dt);
     ~physics_gl();
 
-
-//private:
+    // private:
     GLint view_uniform, project_uniform;
-    GLint vertices_attrib, positions_attrib, colors_attrib, scale_attrib;
-    GLuint vertices_vbo, positions_vbo, colors_vbo, scale_vbo, vao;
+    GLint positions_attrib, colors_attrib;
+    GLuint positions_vbo, colors_vbo, vao;
     glm::mat4 perspective_matrix;
     std::mutex mutex;
     float step_dt, step_camera;
     int num_particles;
 
     GLDisplay disp;
-	GLShader shader;
+    GLShader shader;
     PBodies bodies;
 
     void make_gl_buffers();
@@ -44,5 +42,4 @@ public:
     const float DEFAULT_STEP_CAMERA = 0.01;
 };
 
-
-#endif //GRAVITY_PHYSICS_GL_H
+#endif  // GRAVITY_PHYSICS_GL_H

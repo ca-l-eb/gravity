@@ -1,47 +1,56 @@
-#include <utility>
 #include <GL/glew.h>
+#include <utility>
 #ifdef __APPLE__
-    #include <OpenCL/cl.h>
-    #include <OpenCL/cl_gl.h>
-    #include <OpenCL/cl_gl_ext.h>
-    #include <OpenCL/cl_ext.h>
-    #include <OpenCL/opencl.h>
-    #include <OpenGL/CGLContext.h>
-    #include <OpenGL/OpenGL.h>
+#include <OpenCL/cl.h>
+#include <OpenCL/cl_ext.h>
+#include <OpenCL/cl_gl.h>
+#include <OpenCL/cl_gl_ext.h>
+#include <OpenCL/opencl.h>
+#include <OpenGL/CGLContext.h>
+#include <OpenGL/OpenGL.h>
 #else
-    #include <CL/cl.h>
-	#include <CL/cl_gl.h>
-	#include <CL/cl_gl_ext.h>
-    #ifdef _WIN32
-		#include <GL/wglew.h>
-	#else
-		#include <GL/glx.h>
-		#include <GL/glext.h>
-    #endif
+#include <CL/cl.h>
+#include <CL/cl_gl.h>
+#include <CL/cl_gl_ext.h>
+#ifdef _WIN32
+#include <GL/wglew.h>
+#else
+#include <GL/glx.h>
+#include <GL/glext.h>
+#endif
 #endif
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <math.h>
+#include <string.h>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include <math.h>
-#include <string.h>
-#include <ctime>
 
-#include "simpleio.h"
 #include "physics_cl.h"
 #include "physics_gl.h"
+#include "simpleio.h"
 
+static int check_error(cl_int err, const char *message)
+{
+    if (err != CL_SUCCESS) {
+        std::cerr << "ERROR: " << message << " (" << err << ")" << std::endl;
+        return 1;
+    }
+    return 0;
+}
 
-physics_cl::physics_cl(physics_gl* p) {
+physics_cl::physics_cl(physics_gl *p)
+{
     pgl = p;
     platform = get_platform();
-	gpu_device = get_best_device();
+    gpu_device = get_best_device();
 
     std::cout << "Best device: ";
     print_device_name(gpu_device);
@@ -49,10 +58,10 @@ physics_cl::physics_cl(physics_gl* p) {
     context = get_context();
     queue = get_command_queue();
 
-    char *kernel_source = read_file("./res/physics.cl");
+    auto kernel_source = read_file("res/physics.cl");
     program = make_program(kernel_source);
 
-    cl_int error = 0;
+    auto error = 0;
     apply_gravity_kernel = clCreateKernel(program, "apply_gravity", &error);
     check_error(error, "apply_gravity kernel creation");
     update_kernel = clCreateKernel(program, "update_positions", &error);
@@ -61,12 +70,12 @@ physics_cl::physics_cl(physics_gl* p) {
     make_buffers();
 
     global_dimensions[0] = p->num_particles;
-    global_dimensions[1] = 1;
-    global_dimensions[2] = 1;
-
+    global_dimensions[1] = 0;
+    global_dimensions[2] = 0;
 }
 
-physics_cl::~physics_cl() {
+physics_cl::~physics_cl()
+{
     clReleaseMemObject(input_pos);
     clReleaseMemObject(input_vel);
     clReleaseMemObject(input_acc);
@@ -78,290 +87,192 @@ physics_cl::~physics_cl() {
     clReleaseContext(context);
 };
 
-
-void physics_cl::make_buffers() {
-    int size = pgl->num_particles;
-    cl_int error = 0;
+void physics_cl::make_buffers()
+{
+    auto size = pgl->num_particles;
+    auto error = 0;
+    auto vec_size = sizeof(glm::vec3) * size;
     // Map the OpenGL VBO memory to this OpenCL context if it is a GL context
     if (gl_context) {
         input_pos = clCreateFromGLBuffer(context, CL_MEM_READ_ONLY, pgl->positions_vbo, &error);
         std::cout << "Using OpenGL buffer" << std::endl;
-        check_error(error, "clCreateBuffer opengl");
-    }
-    else {
+        check_error(error, "clCreateFromGLBuffer");
+    } else {
         // Need to update these positions each frame if its not shared by OpenGL
-        input_pos = clCreateBuffer(context, CL_MEM_READ_ONLY, size * sizeof(glm::vec3), NULL, &error);
-        clEnqueueWriteBuffer(queue, input_pos, CL_FALSE, 0, size * sizeof(glm::vec3), pgl->bodies.pos, 0, NULL, NULL);
-        check_error(error, "clCreateBuffer normal buffer");
+        input_pos =
+            clCreateBuffer(context, CL_MEM_READ_ONLY, vec_size, nullptr, &error);
+        check_error(error, "clCreateBuffer");
+        clEnqueueWriteBuffer(queue, input_pos, CL_FALSE, 0, vec_size, pgl->bodies.pos.data(), 0,
+                             nullptr, nullptr);
     }
 
-
-    input_vel = clCreateBuffer(context, CL_MEM_READ_ONLY, size * sizeof(glm::vec3), NULL, &error);
+    input_vel = clCreateBuffer(context, CL_MEM_READ_ONLY, vec_size, nullptr, &error);
     check_error(error, "clCreateBuffers input_vel");
-    input_acc = clCreateBuffer(context, CL_MEM_READ_ONLY, size * sizeof(glm::vec3), NULL, &error);
+    input_acc = clCreateBuffer(context, CL_MEM_READ_ONLY, vec_size, nullptr, &error);
     check_error(error, "clCreateBuffers input_acc");
-    input_mass = clCreateBuffer(context, CL_MEM_READ_ONLY, size * sizeof(float), NULL, &error);
+    input_mass = clCreateBuffer(context, CL_MEM_READ_ONLY, size * sizeof(float), nullptr, &error);
     check_error(error, "clCreateBuffers input_mass");
-    input_dt = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float), NULL, &error);
+    input_dt = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float), nullptr, &error);
     check_error(error, "clCreateBuffers input_dt");
-    input_size = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int), NULL, &error);
-    check_error(error, "clCreateBuffers input_size");
 
-    error = clEnqueueWriteBuffer(queue, input_vel, CL_FALSE, 0, size * sizeof(glm::vec3), pgl->bodies.vel, 0, NULL, NULL);
+    error = clEnqueueWriteBuffer(queue, input_vel, CL_FALSE, 0, vec_size, pgl->bodies.vel.data(), 0,
+                                 nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_vel");
-    error = clEnqueueWriteBuffer(queue, input_acc, CL_FALSE, 0, size * sizeof(glm::vec3), pgl->bodies.acc, 0, NULL, NULL);
+    error = clEnqueueWriteBuffer(queue, input_acc, CL_FALSE, 0, vec_size, pgl->bodies.acc.data(), 0,
+                                 nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_acc");
-    error = clEnqueueWriteBuffer(queue, input_mass, CL_FALSE, 0, size * sizeof(float), pgl->bodies.mass, 0, NULL, NULL);
+    error = clEnqueueWriteBuffer(queue, input_mass, CL_FALSE, 0, size * sizeof(float),
+                                 pgl->bodies.mass.data(), 0, nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_mass");
-    error = clEnqueueWriteBuffer(queue, input_dt, CL_FALSE, 0, sizeof(float), &pgl->step_dt, 0, NULL, NULL);
+    error = clEnqueueWriteBuffer(queue, input_dt, CL_FALSE, 0, sizeof(float), &pgl->step_dt, 0,
+                                 nullptr, nullptr);
     check_error(error, "clEnqueueWriteBuffer input_dt");
-    error = clEnqueueWriteBuffer(queue, input_size, CL_FALSE, 0, sizeof(int), &pgl->num_particles, 0, NULL, NULL);
-    check_error(error, "clEnqueueWriteBuffer input_size");
     clFinish(queue);
 }
 
-static int setup_OpenCL() {
+cl_platform_id physics_cl::get_platform()
+{
+    auto platformIdCount = 0U;
+    clGetPlatformIDs(0, nullptr, &platformIdCount);
 
-    std::clock_t start;
-    start = std::clock();
+    auto platformIds = std::vector<cl_platform_id>(platformIdCount);
+    clGetPlatformIDs(platformIdCount, platformIds.data(), nullptr);
 
-    const int num_elements = 1 << 25;
-    float *buffer = new float[num_elements];
-    const int buffer_size = sizeof(float) * num_elements;
-    for (int i = 0; i < num_elements; i++) {
-//        buffer[i] = 1.0f / std::sqrtf(i + 1);
-    }
-
-    double duration = (std::clock() - start) / (double) CLOCKS_PER_SEC;
-    std::cout << "Took " << duration << " seconds to run on CPU" << std::endl;
-
-    for (int i = 0; i < num_elements; i++) {
-        buffer[i] = float(i);
-    }
-    cl_int error = 0;
-    cl_uint num_devices = 0, check = 0;
-    cl_device_id devices[2]; // 0 - CPU, 1 - GPU
-
-
-
-    int which_device = 1; // Which device do we want to use, GPU
-
-    // Create the context for that device
-    cl_context context = clCreateContext(0, 1, &devices[which_device], NULL, NULL, &error);
-
-    if (error != CL_SUCCESS) {
-        printf("Error creating OpenCL context: %d\n", error);
-        return error;
-    }
-
-    // Create a command queue for our device
-    cl_command_queue queue = clCreateCommandQueue(context, devices[which_device], (cl_command_queue_properties) 0,
-                                                  NULL);
-
-    // Read kernel source, load it, and build kernel
-    char *source = read_file("./res/double.cl");
-    cl_program program = clCreateProgramWithSource(context, 1, (const char **) &source, NULL, NULL);
-
-    // Compile the kernel with all our devices
-    clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
-
-    // Check errors building the kernel
-//    check_build_errors(error, program, devices[which_device]);
-
-    cl_kernel double_kernel = clCreateKernel(program, "vec_double", &error);
-
-    start = std::clock();
-
-    cl_mem input_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY, buffer_size, NULL, NULL);
-    cl_mem output_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, buffer_size, NULL, NULL);
-
-    // Write our data to the input buffer for the device
-    clEnqueueWriteBuffer(queue, input_buffer, CL_TRUE, 0, buffer_size, buffer, 0, NULL, NULL);
-
-    clSetKernelArg(double_kernel, 0, sizeof(float *), &input_buffer);
-    clSetKernelArg(double_kernel, 1, sizeof(float *), &output_buffer);
-
-    size_t global_dimensions[] = {num_elements, 1, 1};
-
-    // Enqueue our problem to actually be executed by the device
-    clEnqueueNDRangeKernel(queue, double_kernel, 1, NULL, global_dimensions, NULL, 0, NULL, NULL);
-//    check_error(error, "clEnqueueNDRangeKernel");
-
-    // Wait for the queue to finish
-    clFinish(queue);
-
-    duration = (std::clock() - start) / (double) CLOCKS_PER_SEC;
-    std::cout << "Took " << duration << " seconds to run on GPU" << std::endl;
-
-    // Now read data back to the original buffer
-    clEnqueueReadBuffer(queue, output_buffer, CL_TRUE, 0, buffer_size, buffer, 0, NULL, NULL);
-
-    duration = ((std::clock() - start) / (double) CLOCKS_PER_SEC) - duration;
-    std::cout << "Took " << duration << " seconds to move data back to CPU" << std::endl;
-
-
-//    for (int i = 0; i < num_elements; i++) {
-//        printf("data[%d] = %.16f\n", i, buffer[i]);
-//    }
-
-    delete[] buffer;
-
-
-    return 0;
-}
-
-cl_platform_id physics_cl::get_platform() {
-    cl_uint platformIdCount = 0;
-    clGetPlatformIDs (0, nullptr, &platformIdCount);
-
-    std::vector<cl_platform_id> platformIds (platformIdCount);
-    clGetPlatformIDs (platformIdCount, platformIds.data (), nullptr);
     std::cout << "Found " << platformIdCount << " platforms: " << std::endl;
-    for (int i = 0; i < platformIdCount; i++) {
+    for (auto i = 0U; i < platformIdCount; i++) {
         print_platform_name(platformIds[i]);
     }
+
     return platformIds[0];
 }
 
-cl_context physics_cl::get_context() {
+cl_context physics_cl::get_context()
+{
 // Help from: http://sa10.idav.ucdavis.edu/docs/sa10-dg-opencl-gl-interop.pdf
 // Create CL context properties, add handle & share-group enum
 #ifdef __APPLE__
     // Get current CGL Context and CGL Share group
-    CGLContextObj kCGLContext = CGLGetCurrentContext();
-    CGLShareGroupObj kCGLShareGroup = CGLGetShareGroup(kCGLContext);
-    cl_context_properties properties[] = { CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
-                                           (cl_context_properties) kCGLShareGroup, 0 };
+    auto kCGLContext = CGLGetCurrentContext();
+    auto kCGLShareGroup = CGLGetShareGroup(kCGLContext);
+    auto properties[] = {CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
+                         (cl_context_properties) kCGLShareGroup, 0};
 #elif _WIN32
     cl_context_properties properties[] = {
-                                           CL_GL_CONTEXT_KHR, (cl_context_properties) wglGetCurrentContext(), // WGL Context
-                                           CL_WGL_HDC_KHR, (cl_context_properties) wglGetCurrentDC(), // WGL HDC
-                                           CL_CONTEXT_PLATFORM, (cl_context_properties) platform, 0 };
+        CL_GL_CONTEXT_KHR,
+        (cl_context_properties) wglGetCurrentContext(),  // WGL Context
+        CL_WGL_HDC_KHR,
+        (cl_context_properties) wglGetCurrentDC(),  // WGL HDC
+        CL_CONTEXT_PLATFORM,
+        (cl_context_properties) platform,
+        0};
 #else
     cl_context_properties properties[] = {
-            CL_GL_CONTEXT_KHR, (cl_context_properties) glXGetCurrentContext(), // GLX Context
-            CL_GLX_DISPLAY_KHR, (cl_context_properties) glXGetCurrentDisplay(), // GLX GLDisplay
-            CL_CONTEXT_PLATFORM, (cl_context_properties) platform, // OpenCL platform
-            0
-    };
+        CL_GL_CONTEXT_KHR,
+        (cl_context_properties) glXGetCurrentContext(),  // GLX Context
+        CL_GLX_DISPLAY_KHR,
+        (cl_context_properties) glXGetCurrentDisplay(),  // GLX GLDisplay
+        CL_CONTEXT_PLATFORM,
+        (cl_context_properties) platform,  // OpenCL platform
+        0};
 #endif
     cl_context context = 0;
-    size_t size = 0;
-    cl_int error = 0;
+    auto error = 0;
+
 #ifdef __APPLE__
-    context = clCreateContext(properties, 1, &gpu_device, NULL, NULL, &error);
-	if (!error) {
+    context = clCreateContext(properties, 1, &gpu_device, nullptr, nullptr, &error);
+    if (!error) {
         gl_context = true;
         return context;
-    }
-    else {
-        context = clCreateContext(0, 1, &gpu_device, NULL, NULL, &error);
+    } else {
+        context = clCreateContext(0, 1, &gpu_device, nullptr, nullptr, &error);
         check_error(error, "clCreateContext normal context");
         return context;
     }
 #else
-//    error = clGetGLContextInfoKHR(properties, CL_DEVICES_FOR_GL_CONTEXT_KHR,
-//                                         sizeof(cl_device_id), &gpu_device, &size);
-    size_t bytes = 0;
-
-//    clGetGLContextInfoKHR(properties, CL_DEVICES_FOR_GL_CONTEXT_KHR, 0, NULL, &bytes);
-//    size_t devNum = bytes/sizeof(cl_device_id);
-//    std::vector<cl_device_id> devs (devNum);
-//    clGetGLContextInfoKHR(properties, CL_DEVICES_FOR_GL_CONTEXT_KHR, bytes, &devs[0], NULL);
-//    for (int i = 0; i < devNum; i++) {
-//        print_device_name(devs[i]);
-//    }
-
 #endif
     if (!error) {
         // Create an OpenGL/OpenCL context for this GPU device
-        context = clCreateContext(properties, 1, &gpu_device, NULL, NULL, &error);
-        if (check_error(error, "clCreateContext OpenGL")) {
-            std::cerr << "Could not create OpenGL context for OpenCL" << std::endl;
-        }
-        else {
+        context = clCreateContext(properties, 1, &gpu_device, nullptr, nullptr, &error);
+        if (!check_error(error, "clCreateContext OpenGL")) {
             return context;
         }
+        std::cerr << "Could not create OpenGL context for OpenCL" << std::endl;
     }
-    context = clCreateContext(0, 1, &gpu_device, NULL, NULL, &error);
+    context = clCreateContext(0, 1, &gpu_device, nullptr, nullptr, &error);
     check_error(error, "clCreateContext normal context");
     return context;
 }
 
-cl_command_queue physics_cl::get_command_queue() {
+cl_command_queue physics_cl::get_command_queue()
+{
     // Create a command queue for our device
-    return clCreateCommandQueue(context, gpu_device, (cl_command_queue_properties) 0, NULL);
+    auto error = 0;
+    auto ret = clCreateCommandQueueWithProperties(context, gpu_device, nullptr, &error);
+    if (error)
+        check_error(error, "clCreateCommandQueueWithProperties");
+    return ret;
 }
 
-cl_program physics_cl::make_program(char* kernel_source) {
-    cl_int error = 0;
-    cl_program program = clCreateProgramWithSource(context, 1, (const char **) &kernel_source, NULL, NULL);
+cl_program physics_cl::make_program(const char *kernel_source)
+{
+    auto error = 0;
+    auto program = clCreateProgramWithSource(context, 1, &kernel_source, nullptr, nullptr);
 
     // Compile the kernel with all our devices
-    error = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+    error = clBuildProgram(program, 0, nullptr, nullptr, nullptr, nullptr);
 
     // Check errors building the kernel
     check_build_errors(error, program, gpu_device);
     return program;
 }
 
-cl_device_id physics_cl::get_best_device() {
-    // Get CPU devices
-    cl_uint check = 0;
-	cl_int error = 0;
+cl_device_id physics_cl::get_best_device()
+{
+    auto device_count = 0U;
+    auto max_compute_units = 0L;
+    cl_device_id best_device;
 
-	cl_device_id* devices;
-	cl_device_id best_device;
-	cl_uint device_count;
-	cl_uint max_compute_units = 0;
+    // Get all devices for the platform
+    clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
+    std::vector<cl_device_id> devices(device_count);
+    clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, device_count, devices.data(), nullptr);
 
-	// Get all devices for the platform
-	clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, NULL, &device_count);
-	devices = new cl_device_id[device_count];
-	clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, device_count, devices, NULL);
-
-	// Choose best device, i.e. most compute units
-	for (int i = 0; i < device_count; i++) {
-		cl_uint check_compute_units = 0;
-		clGetDeviceInfo(devices[i], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(check_compute_units), &check_compute_units, NULL);
-		if (check_compute_units > max_compute_units) {
-			max_compute_units = check_compute_units;
-			best_device = devices[i];
-		}
-	}
-	delete[] devices;
-
-	return best_device;
-}
-
-cl_int physics_cl::check_error(cl_int err, const char *message) {
-    if (err != CL_SUCCESS) {
-        std::cerr << "ERROR: " << message << " (" << err << ")" << std::endl;
+    // Choose best device, i.e. most compute units
+    for (auto &device : devices) {
+        auto check_compute_units = 0U;
+        clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(check_compute_units),
+                        &check_compute_units, nullptr);
+        if (check_compute_units > max_compute_units) {
+            max_compute_units = check_compute_units;
+            best_device = device;
+        }
     }
-    return err;
+    return best_device;
 }
 
-std::string physics_cl::get_device_name(cl_device_id id) {
-    size_t size = 0;
+std::string physics_cl::get_device_name(cl_device_id id)
+{
+    auto size = 0UL;
     clGetDeviceInfo(id, CL_DEVICE_NAME, 0, nullptr, &size);
-    std::string result(size + 1, '\0');
-    clGetDeviceInfo(id, CL_DEVICE_NAME, size, const_cast<char *> (result.data()), nullptr);
-    return result;
+    auto s = std::string(size + 1, '\0');
+    clGetDeviceInfo(id, CL_DEVICE_NAME, size, const_cast<char *>(s.data()), nullptr);
+    return s;
 }
 
-std::string physics_cl::get_platform_name(cl_platform_id id) {
-    size_t size = 0;
+std::string physics_cl::get_platform_name(cl_platform_id id)
+{
+    auto size = 0UL;
     clGetPlatformInfo(id, CL_PLATFORM_NAME, 0, nullptr, &size);
-    std::string result(size + 1, '\0');
-    clGetPlatformInfo(id, CL_PLATFORM_NAME, size, const_cast<char *> (result.data()), nullptr);
-    return result;
+    auto s = std::string(size + 1, '\0');
+    clGetPlatformInfo(id, CL_PLATFORM_NAME, size, const_cast<char *>(s.data()), nullptr);
+    return s;
 }
 
-std::string physics_cl::get_device_extensions(cl_device_id id) {
-    size_t ext_size = 1024;
-    std::string str (1024, '\0');
-    // Get string containing supported device extensions
-    cl_int err = clGetDeviceInfo(id, CL_DEVICE_EXTENSIONS, ext_size, &str, &ext_size);
+std::string physics_cl::get_device_extensions(cl_device_id id)
+{
+    auto ext_size = 1024UL;
+    auto str = std::string(ext_size, '\0');
+    auto err = clGetDeviceInfo(id, CL_DEVICE_EXTENSIONS, ext_size, &str, &ext_size);
     if (err || ext_size == 0) {
         check_error(err, "clGetDeviceInfo extensions");
         return "";
@@ -369,15 +280,17 @@ std::string physics_cl::get_device_extensions(cl_device_id id) {
     return str;
 }
 
-int physics_cl::is_extension_supported(const char* extension_name, cl_device_id id) {
-    std::string extensions = get_device_extensions(id);
+int physics_cl::is_extension_supported(const char *extension_name, cl_device_id id)
+{
+    auto extensions = get_device_extensions(id);
     if (extensions.find(extension_name, 0) != std::string::npos) {
         return 1;
     }
     return 0;
 }
 
-int physics_cl::cl_gl_compatibility(cl_device_id id) {
+int physics_cl::cl_gl_compatibility(cl_device_id id)
+{
     if (is_extension_supported(CL_GL_SHARING_EXT, id)) {
         std::cout << get_device_name(id) << " supports OpenGL interoperability" << std::endl;
         return 1;
@@ -385,225 +298,203 @@ int physics_cl::cl_gl_compatibility(cl_device_id id) {
     return 0;
 }
 
-void physics_cl::print_device_name(cl_device_id id) {
-    std::string name = get_device_name(id);
-    std::cout << name << std::endl;
+void physics_cl::print_device_name(cl_device_id id)
+{
+    std::cout << get_device_name(id) << std::endl;
 }
 
-void physics_cl::print_platform_name(cl_platform_id id) {
-    std::string name = get_platform_name(id);
-    std::cout << name << std::endl;
+void physics_cl::print_platform_name(cl_platform_id id)
+{
+    std::cout << get_platform_name(id) << std::endl;
 }
 
-void physics_cl::check_build_errors(cl_int error, cl_program program, cl_device_id deviceID) {
+void physics_cl::check_build_errors(cl_int error, cl_program program, cl_device_id deviceID)
+{
     if (error) {
         printf("Error = %d\n", error);
-        size_t len = 0;
-        clGetProgramBuildInfo(program, deviceID, CL_PROGRAM_BUILD_LOG, 0, NULL, &len);
-        char *log = new char[len];
-        clGetProgramBuildInfo(program, deviceID, CL_PROGRAM_BUILD_LOG, len, log, NULL);
-        std::cerr << log << std::endl;
-        delete[] log;
+        auto len = 0UL;
+        clGetProgramBuildInfo(program, deviceID, CL_PROGRAM_BUILD_LOG, 0, nullptr, &len);
+        auto log = std::string(len, '\0');
+        clGetProgramBuildInfo(program, deviceID, CL_PROGRAM_BUILD_LOG, len,
+                              const_cast<char *>(log.c_str()), nullptr);
+        std::cerr << log << '\n';
     }
 }
 
-void physics_cl::apply_gravity() {
+void physics_cl::apply_gravity()
+{
     clSetKernelArg(apply_gravity_kernel, 0, sizeof(input_pos), &input_pos);
     clSetKernelArg(apply_gravity_kernel, 1, sizeof(input_vel), &input_vel);
     clSetKernelArg(apply_gravity_kernel, 2, sizeof(input_acc), &input_acc);
     clSetKernelArg(apply_gravity_kernel, 3, sizeof(input_mass), &input_mass);
-    clSetKernelArg(apply_gravity_kernel, 4, sizeof(input_size), &input_size);
 
     // Enqueue our problem to actually be executed by the device
-    clEnqueueNDRangeKernel(queue, apply_gravity_kernel, 1, NULL, global_dimensions, NULL, 0, NULL, NULL);
-    // Wait for the queue to finish
+    clEnqueueNDRangeKernel(queue, apply_gravity_kernel, 1, nullptr, global_dimensions, nullptr, 0, nullptr,
+                           nullptr);
     clFinish(queue);
 }
 
-void physics_cl::update_positions() {
-    clSetKernelArg(update_kernel, 0, sizeof(float*), &input_pos);
-    clSetKernelArg(update_kernel, 1, sizeof(float*), &input_vel);
-    clSetKernelArg(update_kernel, 2, sizeof(float*), &input_acc);
-    clSetKernelArg(update_kernel, 3, sizeof(float*), &input_dt);
+void physics_cl::update_positions()
+{
+    clSetKernelArg(update_kernel, 0, sizeof(float *), &input_pos);
+    clSetKernelArg(update_kernel, 1, sizeof(float *), &input_vel);
+    clSetKernelArg(update_kernel, 2, sizeof(float *), &input_acc);
+    clSetKernelArg(update_kernel, 3, sizeof(float *), &input_dt);
 
     // Enqueue our problem to actually be executed by the device
-    clEnqueueNDRangeKernel(queue, update_kernel, 1, NULL, global_dimensions, NULL, 0, NULL, NULL);
-    // Wait for the queue to finish
+    clEnqueueNDRangeKernel(queue, update_kernel, 1, nullptr, global_dimensions, nullptr, 0, nullptr, nullptr);
     clFinish(queue);
 }
 
 // http://dhruba.name/2012/08/14/opencl-cookbook-listing-all-devices-and-their-critical-attributes/
-void physics_cl::print_platform_info() {
-	int i, j;
-	char* value;
-	size_t valueSize;
-	cl_uint platformCount;
-	cl_platform_id* platforms;
-	cl_uint deviceCount;
-	cl_device_id* devices;
-	cl_uint maxComputeUnits;
+void physics_cl::print_platform_info()
+{
+    char buffer[2048];
+    auto size = 0UL;
 
-	// get all platforms
-	clGetPlatformIDs(0, NULL, &platformCount);
-	platforms = (cl_platform_id*)malloc(sizeof(cl_platform_id) * platformCount);
-	clGetPlatformIDs(platformCount, platforms, NULL);
-	for (i = 0; i < platformCount; i++) {
-		std::cout << "Platform " << i << ":" << std::endl;
-		// get all devices
-		clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 0, NULL, &deviceCount);
-		devices = (cl_device_id*)malloc(sizeof(cl_device_id) * deviceCount);
-		clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, deviceCount, devices, NULL);
+    auto platformCount = 0U;
+    clGetPlatformIDs(0, nullptr, &platformCount);
+    auto platformIds = std::vector<cl_platform_id>(platformCount);
+    clGetPlatformIDs(platformCount, platformIds.data(), nullptr);
 
-		// for each device print critical attributes
-		for (j = 0; j < deviceCount; j++) {
+    auto i = 1;
+    for (auto &platform : platformIds) {
+        auto device_count = 0U;
+        clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
 
-			// print device name
-			clGetDeviceInfo(devices[j], CL_DEVICE_NAME, 0, NULL, &valueSize);
-			value = (char*)malloc(valueSize);
-			clGetDeviceInfo(devices[j], CL_DEVICE_NAME, valueSize, value, NULL);
-			printf("%d. Device: %s\n", j + 1, value);
-			free(value);
+        auto devices = std::vector<cl_device_id>(device_count);
+        clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, device_count, devices.data(), nullptr);
 
-			// print hardware device version
-			clGetDeviceInfo(devices[j], CL_DEVICE_VERSION, 0, NULL, &valueSize);
-			value = (char*)malloc(valueSize);
-			clGetDeviceInfo(devices[j], CL_DEVICE_VERSION, valueSize, value, NULL);
-			printf(" %d.%d Hardware version: %s\n", j + 1, 1, value);
-			free(value);
+        for (auto &device : devices) {
+            auto j = i;
+            clGetDeviceInfo(device, CL_DEVICE_NAME, sizeof(buffer), buffer, &size);
+            buffer[size] = '\0';
+            printf("%d. Device: %s\n", j, buffer);
 
-			// print software driver version
-			clGetDeviceInfo(devices[j], CL_DRIVER_VERSION, 0, NULL, &valueSize);
-			value = (char*)malloc(valueSize);
-			clGetDeviceInfo(devices[j], CL_DRIVER_VERSION, valueSize, value, NULL);
-			printf(" %d.%d Software version: %s\n", j + 1, 2, value);
-			free(value);
+            clGetDeviceInfo(device, CL_DEVICE_VERSION, sizeof(buffer), buffer, &size);
+            buffer[size] = '\0';
+            printf(" %d.%d Hardware version: %s\n", j, 1, buffer);
 
-			// print c version supported by compiler for device
-			clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, 0, NULL, &valueSize);
-			value = (char*)malloc(valueSize);
-			clGetDeviceInfo(devices[j], CL_DEVICE_OPENCL_C_VERSION, valueSize, value, NULL);
-			printf(" %d.%d OpenCL C version: %s\n", j + 1, 3, value);
-			free(value);
+            clGetDeviceInfo(device, CL_DRIVER_VERSION, sizeof(buffer), buffer, &size);
+            buffer[size] = '\0';
+            printf(" %d.%d Software version: %s\n", j, 2, buffer);
 
-			// print parallel compute units
-			clGetDeviceInfo(devices[j], CL_DEVICE_MAX_COMPUTE_UNITS,
-				sizeof(maxComputeUnits), &maxComputeUnits, NULL);
-			printf(" %d.%d Parallel compute units: %d\n", j + 1, 4, maxComputeUnits);
+            clGetDeviceInfo(device, CL_DEVICE_OPENCL_C_VERSION, sizeof(buffer), buffer, &size);
+            buffer[size] = '\0';
+            printf(" %d.%d OpenCL C version: %s\n", j, 3, buffer);
 
-		}
-		free(devices);
-	}
-	free(platforms);
+            auto compute_units = 0;
+            clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(compute_units),
+                            &compute_units, nullptr);
+            printf(" %d.%d Parallel compute units: %d\n", j, 4, compute_units);
+            j++;
+        }
+        i++;
+    }
 }
 
-
-static void handle_args(int argc, char* argv[], int& count, float& dt, float& step) {
-    if (argc == 2) {
-        std::string fs(argv[1]);
-        step = std::stof(fs);
+static void handle_args(int argc, char *argv[], int &count, float &dt, float &step)
+{
+    if (argc > 1) {
+        std::string fs = std::string(argv[1]);
+        count = std::stof(fs);
     }
-    if (argc == 3) {
-        std::string is(argv[1]);
-        count = std::stoi(is);
-        std::string fs(argv[2]);
+    if (argc > 2) {
+        std::string fs = std::string(argv[2]);
         dt = std::stof(fs);
     }
-    if (argc == 4) {
-        std::string is(argv[1]);
-        count = std::stoi(is);
-        std::string fs(argv[2]);
-        dt = std::stof(fs);
-        fs = std::string(argv[3]);
+    if (argc > 3) {
+        std::string fs = std::string(argv[3]);
         step = std::stof(fs) / 300.0f;
     }
 }
 
-int main(int argc, char *argv[]) {
-	int count = 1 << 13;
-	float dt = 0.00005f;
-	float step = float(M_PI / 300.0f) / 15.0f;
+int main(int argc, char *argv[])
+{
+    auto count = 1 << 12;
+    auto dt = 0.0005f;
+    auto step = float(M_PI / 300.0f) / 15.0f;
     handle_args(argc, argv, count, dt, step);
 
-	physics_gl p(1600, 900, count, dt);
-	if (p.disp.wasError()) {
-		return p.disp.wasError();
-	}
+    physics_gl p(1600, 900, count, dt);
+    if (p.disp.wasError()) {
+        return p.disp.wasError();
+    }
 
-	printf("OpenGL version: %s\n", glGetString(GL_VERSION));
+    printf("OpenGL version: %s\n", glGetString(GL_VERSION));
 
-	physics_cl c(&p);
-	c.print_platform_info();
+    auto c = physics_cl{&p};
+    c.print_platform_info();
 
-	int size_particle = 3 * sizeof(glm::vec3);
+    // Bind shader and use VAO so OpenGL draws correctly
+    p.shader.use();
+    glBindVertexArray(p.vao);
 
-	// Bind shader and use VAO so OpenGL draws correctly
-	p.shader.use();
-	glBindVertexArray(p.vao);
+    auto aspect_ratio = (float) p.disp.getWidth() / p.disp.getHeight();
+    p.perspective_matrix = glm::perspective(80.0f, aspect_ratio, 0.1f, 100.0f);
+    glUniformMatrix4fv(p.project_uniform, 1, GL_FALSE, glm::value_ptr(p.perspective_matrix));
 
-	p.perspective_matrix = glm::perspective(80.0f, (float)p.disp.getWidth() / (float)p.disp.getHeight(), 0.1f, 100.0f);
-	glUniformMatrix4fv(p.project_uniform, 1, GL_FALSE, glm::value_ptr(p.perspective_matrix));
+    auto camera_target = glm::vec3(0.0f, 0.0f, 0.0f);
+    auto up = glm::vec3(0.0f, 1.0f, 0.0f);
+    auto counter = 0.0f;
 
+    // Set the camera transformation, and send it to OpenGL
+    auto view =
+        glm::lookAt(glm::vec3(2 * sin(counter), 1.1f * sin(1.3 * counter) * cos(.33f * counter),
+                              2 * cos(counter)),
+                    camera_target, up);
+    glUniformMatrix4fv(p.view_uniform, 1, GL_FALSE, glm::value_ptr(view));
 
-	glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-	glm::mat4 view;
+    glEnable(GL_DEPTH_TEST);
+    glPointSize(1);
 
-	float counter = 0;
-    int frames = 0;
-	// Set the camera transformation, and send it to OpenGL
-	view = glm::lookAt(glm::vec3(2 * sin(counter), 1.1f*sin(1.3*counter)*cos(.33f*counter), 2 * cos(counter)), cameraTarget, up);
-	//view = glm::lookAt(glm::vec3(2.5 * sin(counter), 0.5f , 2.5 * cos(counter)), cameraTarget, up);
-	glUniformMatrix4fv(p.view_uniform, 1, GL_FALSE, glm::value_ptr(view));
-
-
-	while (!p.disp.isClosed()) {
-		p.disp.clear(0.0f, 0.0f, 0.0f, 1.0f);
-		if (p.disp.wasResized()) {
-			p.perspective_matrix = glm::perspective(80.0f, (float)p.disp.getWidth() / (float)p.disp.getHeight(), 0.1f, 100.0f);
-			glUniformMatrix4fv(p.project_uniform, 1, GL_FALSE, glm::value_ptr(p.perspective_matrix));
-			glViewport(0, 0, p.disp.getWidth(), p.disp.getHeight());
+    while (!p.disp.isClosed()) {
+        p.disp.clear(0.0f, 0.0f, 0.0f, 1.0f);
+        if (p.disp.wasResized()) {
+            aspect_ratio = (float) p.disp.getWidth() / p.disp.getHeight();
+            p.perspective_matrix = glm::perspective(80.0f, aspect_ratio, 0.1f, 100.0f);
+            glUniformMatrix4fv(p.project_uniform, 1, GL_FALSE,
+                               glm::value_ptr(p.perspective_matrix));
+            glViewport(0, 0, p.disp.getWidth(), p.disp.getHeight());
         }
         if (c.is_gl_context()) {
-            // Update particle positions using OpenCL. First acquire the OpenGL object, the update, then release
-
-            // Flush GL queue
+            // Acquire shared objects
             glFlush();
-
-			// Acquire shared objects
-			cl_int err = clEnqueueAcquireGLObjects(c.queue, 1, &c.input_pos, 0, NULL, NULL);
-			c.check_error(err, "clEnqueueAcquireGLObjects");
+            auto err = clEnqueueAcquireGLObjects(c.queue, 1, &c.input_pos, 0, nullptr, nullptr);
+            check_error(err, "clEnqueueAcquireGLObjects");
 
             // Update the positions while OpenCL has acquired the OpenGL buffers
-			c.apply_gravity();
-			c.update_positions();
+            c.apply_gravity();
+            c.update_positions();
 
-			// Release shared objects
-			err = clEnqueueReleaseGLObjects(c.queue, 1, &c.input_pos, 0, NULL, NULL);
-			c.check_error(err, "releasing GL objects");
-			clFinish(c.queue);
-		}
-		else {
+            // Release shared objects
+            err = clEnqueueReleaseGLObjects(c.queue, 1, &c.input_pos, 0, nullptr, nullptr);
+            check_error(err, "releasing GL objects");
+            clFinish(c.queue);
+        } else {
             // Else context is not OpenGL shared buffer, we need to read the data back, then write
             // it back to OpenGL to display the updated positions of the particles
-			c.apply_gravity();
-			c.update_positions();
-			clEnqueueReadBuffer(c.queue, c.input_pos, CL_TRUE, 0, p.num_particles * sizeof(glm::vec3), p.bodies.pos, 0, NULL, NULL);
-			clFinish(c.queue);
-			glBindBuffer(GL_ARRAY_BUFFER, p.positions_vbo);
-			glBufferSubData(GL_ARRAY_BUFFER, 0, p.num_particles * sizeof(glm::vec3), (GLvoid *)p.bodies.pos);
-		}
+            c.apply_gravity();
+            c.update_positions();
+            clEnqueueReadBuffer(c.queue, c.input_pos, CL_TRUE, 0,
+                                p.num_particles * sizeof(glm::vec3), p.bodies.pos.data(), 0, nullptr, nullptr);
+            clFinish(c.queue);
+            glBindBuffer(GL_ARRAY_BUFFER, p.positions_vbo);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, p.num_particles * sizeof(glm::vec3),
+                            (GLvoid *) p.bodies.pos.data());
+        }
 
         // Update the camera
-		counter += step;
-		view = glm::lookAt(glm::vec3(2 * sin(counter), 1.1f*sin(1.3*counter)*cos(.33f*counter), 2 * cos(counter)), cameraTarget, up);
-		//view = glm::lookAt(glm::vec3(2.5 * sin(counter), 0.5f , 2.5 * cos(counter)), cameraTarget, up);
-		glUniformMatrix4fv(p.view_uniform, 1, GL_FALSE, glm::value_ptr(view));
+        counter += step;
+        view =
+            glm::lookAt(glm::vec3(2 * sin(counter), 1.1f * sin(1.3 * counter) * cos(.33f * counter),
+                                  2 * cos(counter)),
+                        camera_target, up);
+        glUniformMatrix4fv(p.view_uniform, 1, GL_FALSE, glm::value_ptr(view));
 
-
-		// Finally, draw the particles to the screen, and update
-		glDrawArraysInstanced(GL_TRIANGLES, 0, size_particle, count);
-		p.disp.update();
-	}
-
-	return 0;
+        // Finally, draw the particles to the screen, and update
+        glDrawArraysInstanced(GL_POINTS, 0, 3 * sizeof(glm::vec3), count);
+        p.disp.update();
+    }
+    return 0;
 }
