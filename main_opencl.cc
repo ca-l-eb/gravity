@@ -1,33 +1,7 @@
-#include <GL/glew.h>
-
-#ifdef __APPLE__
-#include <OpenCL/cl.h>
-#include <OpenCL/cl_ext.h>
-#include <OpenCL/cl_gl.h>
-#include <OpenCL/cl_gl_ext.h>
-#include <OpenCL/opencl.h>
-#include <OpenGL/CGLContext.h>
-#include <OpenGL/OpenGL.h>
-#else
-#include <CL/cl.h>
-#include <CL/cl_gl.h>
-#include <CL/cl_gl_ext.h>
-#ifdef _WIN32
-#include <GL/wglew.h>
-#else
-#include <GL/glext.h>
-#include <GL/glx.h>
-#endif
-#endif
-
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <math.h>
 #include <string.h>
-#include <cstdio>
-#include <cstdlib>
-#include <ctime>
-#include <fstream>
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -62,7 +36,7 @@ int main(int argc, char *argv[])
 
     auto count = 1 << 12;
     auto dt = 0.0005f;
-    auto step = float(M_PI / 300.0f) / 15.0f;
+    auto step = static_cast<float>(M_PI) / (360.0f * 15.0f);
     handle_args(argc, argv, count, dt, step);
 
     physics_gl pgl{count, dt};
@@ -74,7 +48,7 @@ int main(int argc, char *argv[])
     pgl.use_shader();
     pgl.bind();
 
-    auto aspect_ratio = (float) display.getWidth() / display.getHeight();
+    auto aspect_ratio = static_cast<float>(display.getWidth()) / display.getHeight();
     pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
 
     auto camera_target = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -95,7 +69,7 @@ int main(int argc, char *argv[])
     while (!display.isClosed()) {
         display.clear(0.0f, 0.0f, 0.0f, 1.0f);
         if (display.wasResized()) {
-            aspect_ratio = (float) display.getWidth() / display.getHeight();
+            aspect_ratio = static_cast<float>(display.getWidth()) / display.getHeight();
             pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
             glViewport(0, 0, display.getWidth(), display.getHeight());
         }
