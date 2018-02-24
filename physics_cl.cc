@@ -15,8 +15,8 @@
 #ifdef _WIN32
 #include <GL/wglew.h>
 #else
-#include <GL/glx.h>
 #include <GL/glext.h>
+#include <GL/glx.h>
 #endif
 #endif
 
@@ -59,7 +59,7 @@ physics_cl::physics_cl(physics_gl *p)
     queue = get_command_queue();
 
     auto kernel_source = read_file("res/physics.cl");
-    program = make_program(kernel_source);
+    program = make_program(kernel_source.c_str());
 
     auto error = 0;
     apply_gravity_kernel = clCreateKernel(program, "apply_gravity", &error);
@@ -99,8 +99,7 @@ void physics_cl::make_buffers()
         check_error(error, "clCreateFromGLBuffer");
     } else {
         // Need to update these positions each frame if its not shared by OpenGL
-        input_pos =
-            clCreateBuffer(context, CL_MEM_READ_ONLY, vec_size, nullptr, &error);
+        input_pos = clCreateBuffer(context, CL_MEM_READ_ONLY, vec_size, nullptr, &error);
         check_error(error, "clCreateBuffer");
         clEnqueueWriteBuffer(queue, input_pos, CL_FALSE, 0, vec_size, pgl->bodies.pos.data(), 0,
                              nullptr, nullptr);
@@ -329,8 +328,8 @@ void physics_cl::apply_gravity()
     clSetKernelArg(apply_gravity_kernel, 3, sizeof(input_mass), &input_mass);
 
     // Enqueue our problem to actually be executed by the device
-    clEnqueueNDRangeKernel(queue, apply_gravity_kernel, 1, nullptr, global_dimensions, nullptr, 0, nullptr,
-                           nullptr);
+    clEnqueueNDRangeKernel(queue, apply_gravity_kernel, 1, nullptr, global_dimensions, nullptr, 0,
+                           nullptr, nullptr);
     clFinish(queue);
 }
 
@@ -342,7 +341,8 @@ void physics_cl::update_positions()
     clSetKernelArg(update_kernel, 3, sizeof(float *), &input_dt);
 
     // Enqueue our problem to actually be executed by the device
-    clEnqueueNDRangeKernel(queue, update_kernel, 1, nullptr, global_dimensions, nullptr, 0, nullptr, nullptr);
+    clEnqueueNDRangeKernel(queue, update_kernel, 1, nullptr, global_dimensions, nullptr, 0, nullptr,
+                           nullptr);
     clFinish(queue);
 }
 
@@ -477,7 +477,8 @@ int main(int argc, char *argv[])
             c.apply_gravity();
             c.update_positions();
             clEnqueueReadBuffer(c.queue, c.input_pos, CL_TRUE, 0,
-                                p.num_particles * sizeof(glm::vec3), p.bodies.pos.data(), 0, nullptr, nullptr);
+                                p.num_particles * sizeof(glm::vec3), p.bodies.pos.data(), 0,
+                                nullptr, nullptr);
             clFinish(c.queue);
             glBindBuffer(GL_ARRAY_BUFFER, p.positions_vbo);
             glBufferSubData(GL_ARRAY_BUFFER, 0, p.num_particles * sizeof(glm::vec3),

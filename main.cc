@@ -128,7 +128,8 @@ int main(int argc, char *argv[])
             std::lock_guard<std::mutex> guard(mu);
             if (updatedPosition) {
                 glBindBuffer(GL_ARRAY_BUFFER, vboPositions);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, b.size() * sizeof(glm::vec3), (GLvoid *) b.pos.data());
+                glBufferSubData(GL_ARRAY_BUFFER, 0, b.size() * sizeof(glm::vec3),
+                                (GLvoid *) b.pos.data());
                 updatedPosition = false;
             }
         }
@@ -141,7 +142,8 @@ int main(int argc, char *argv[])
         counter += step;
 
         auto end = std::chrono::high_resolution_clock::now();
-        auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        auto elapsed_us =
+            std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
         std::this_thread::sleep_for(std::chrono::microseconds(16667 - elapsed_us));
     }
 

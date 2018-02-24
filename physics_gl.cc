@@ -42,13 +42,15 @@ void physics_gl::make_gl_buffers()
 
     // Set up color of circles
     glBindBuffer(GL_ARRAY_BUFFER, colors_vbo);
-    glBufferData(GL_ARRAY_BUFFER, bodies.size() * sizeof(glm::vec3), bodies.color.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, bodies.size() * sizeof(glm::vec3), bodies.color.data(),
+                 GL_STATIC_DRAW);
     glVertexAttribPointer(colors_attrib, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), NULL);
     glEnableVertexAttribArray(colors_attrib);
 
     // Set up offsets (positions of circles), needs to be updated every iteration
     glBindBuffer(GL_ARRAY_BUFFER, positions_vbo);
-    glBufferData(GL_ARRAY_BUFFER, bodies.size() * sizeof(glm::vec3), bodies.pos.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, bodies.size() * sizeof(glm::vec3), bodies.pos.data(),
+                 GL_DYNAMIC_DRAW);
     glVertexAttribPointer(positions_attrib, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), NULL);
     glEnableVertexAttribArray(positions_attrib);
 
@@ -86,29 +88,26 @@ void physics_gl::init_bodies()
             bodies.color[i] = {1.0f, 0.0f, 1.0f};
         }
 #elif defined(FOUR_BLOCKS)
-        if (i < (1.0f/4.0f) * count) { // block 1
-            bodies.pos[i] = { randX - 1.3f, randY, randZ };
-            bodies.vel[i] = { 0.0f, 110.0f, 0.0f }; // Good looping
-            //bodies.vel[i] = { 0.0f, 160.0f, 0.0f }; // Good mixing
-            bodies.color[i] = { 0.0f, 1.0f, 0.0f };
-        }
-        else if (i < (2.0f/3.0f) * count) { // block 2
-            bodies.pos[i] = { randX + 1.3f, randY, randZ };
-            bodies.vel[i] = { 0.0f, -110.0f, 0.0f };
+        if (i < (1.0f / 4.0f) * count) {  // block 1
+            bodies.pos[i] = {randX - 1.3f, randY, randZ};
+            bodies.vel[i] = {0.0f, 110.0f, 0.0f};  // Good looping
+            // bodies.vel[i] = { 0.0f, 160.0f, 0.0f }; // Good mixing
+            bodies.color[i] = {0.0f, 1.0f, 0.0f};
+        } else if (i < (2.0f / 3.0f) * count) {  // block 2
+            bodies.pos[i] = {randX + 1.3f, randY, randZ};
+            bodies.vel[i] = {0.0f, -110.0f, 0.0f};
             //	bodies.vel[i] = { 0.0f, -160.0f, 0.0f };
-            bodies.color[i] = { 1.0f, 0.0f, 1.0f };
-        }
-        else if (i < (3.0f/4.0f) * count) { // block 3
-            bodies.pos[i] = { randX, randY +1.3, randZ };
-            bodies.vel[i] = { 0.0f, 0.0f, 110.0f };
+            bodies.color[i] = {1.0f, 0.0f, 1.0f};
+        } else if (i < (3.0f / 4.0f) * count) {  // block 3
+            bodies.pos[i] = {randX, randY + 1.3, randZ};
+            bodies.vel[i] = {0.0f, 0.0f, 110.0f};
             //	bodies.vel[i] = { 0.0f, -160.0f, 0.0f };
-            bodies.color[i] = { 1.0f, 1.0f, 1.0f };
-        }
-        else { // block 4
-            bodies.pos[i] = { randX, randY-1.3f, randZ };
-            bodies.vel[i] = { 0.0f, 0.0f, -110.0f };
+            bodies.color[i] = {1.0f, 1.0f, 1.0f};
+        } else {  // block 4
+            bodies.pos[i] = {randX, randY - 1.3f, randZ};
+            bodies.vel[i] = {0.0f, 0.0f, -110.0f};
             //	bodies.vel[i] = { 0.0f, -160.0f, 0.0f };
-            bodies.color[i] = { 1.0f, 0.0f, 0.0f };
+            bodies.color[i] = {1.0f, 0.0f, 0.0f};
         }
 #endif
         bodies.mass[i] = static_cast<float>(fabs(dist(gen) * 9.5e9f));

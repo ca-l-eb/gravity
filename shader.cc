@@ -22,14 +22,11 @@ GLShader::GLShader(const char *vertexFile, const char *fragFile)
 {
     program = glCreateProgram();
 
-    const char *vertexSource = read_file(vertexFile);
-    const char *fragSource = read_file(fragFile);
+    auto vertexSource = read_file(vertexFile);
+    auto fragSource = read_file(fragFile);
 
-    shaders[VERTEX_SHADER] = setup_shader(vertexSource, GL_VERTEX_SHADER);
-    shaders[FRAGMENT_SHADER] = setup_shader(fragSource, GL_FRAGMENT_SHADER);
-
-    delete[] vertexSource;
-    delete[] fragSource;
+    shaders[VERTEX_SHADER] = setup_shader(vertexSource.c_str(), GL_VERTEX_SHADER);
+    shaders[FRAGMENT_SHADER] = setup_shader(fragSource.c_str(), GL_FRAGMENT_SHADER);
 
     for (unsigned int i = 0; i < NUM_SHADERS; i++) {
         glAttachShader(program, shaders[i]);
