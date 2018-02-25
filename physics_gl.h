@@ -25,6 +25,11 @@ public:
     void set_view(const glm::mat4 &view);
     void set_perspective(float aspect_ratio, float near, float far);
 
+    inline PBodies *get_bodies()
+    {
+        return &bodies;
+    }
+
     friend class physics_cl;
 
 private:

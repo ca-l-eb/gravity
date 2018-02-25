@@ -189,7 +189,11 @@ cl_context physics_cl::get_context()
 cl_command_queue physics_cl::get_command_queue()
 {
     auto error = 0;
+#ifdef __APPLE__
+    auto ret = clCreateCommandQueue(context, device, 0, &error);
+#elif
     auto ret = clCreateCommandQueueWithProperties(context, device, nullptr, &error);
+#endif
     check_error(error, "clCreateCommandQueueWithProperties");
     return ret;
 }

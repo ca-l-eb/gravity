@@ -1,5 +1,4 @@
-#include <string.h>
-#include <iostream>
+#include <fstream>
 
 #include "simpleio.h"
 
@@ -9,22 +8,13 @@
 
 std::string read_file(const char *filename)
 {
-    FILE *fp = fopen(filename, "rb");
-    if (fp == NULL) {
-        return NULL;
-    }
-    fseek(fp, 0L, SEEK_END);
-    auto size = ftell(fp);
-    auto contents = std::string(size, '\0');
+    auto fs = std::ifstream{filename};
+    std::string contents;
 
-    fseek(fp, 0L, SEEK_SET);
-    auto len = fread(const_cast<char *>(contents.c_str()), sizeof(char), size, fp);
+    fs.seekg(0, std::ios::end);
+    contents.reserve(fs.tellg());
+    fs.seekg(0, std::ios::beg);
 
-    if (len != size) {
-        std::cerr << "Error reading " << filename << "Got " << len << " byes, but expected " << size
-                  << "." << std::endl;
-    }
-
-    fclose(fp);
+    contents.assign((std::istreambuf_iterator<char>(fs)), std::istreambuf_iterator<char>());
     return contents;
 }
