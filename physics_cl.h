@@ -18,7 +18,7 @@
 class physics_cl
 {
 public:
-    physics_cl(physics_gl &p);
+    physics_cl(physics_gl &p, const std::string &prefered_platform);
     ~physics_cl();
 
     inline bool is_gl_context()
@@ -52,23 +52,6 @@ private:
     void print_platform_name(cl_platform_id id);
     void check_build_errors(cl_int error, cl_program program, cl_device_id deviceID);
     void make_buffers();
-
-    cl_device_id get_best_device();
-    cl_platform_id get_platform();
-    cl_context get_context();
-    cl_command_queue get_command_queue();
-    cl_program make_program(const char *kernel_source);
-    std::string get_device_name(cl_device_id id);
-    std::string get_platform_name(cl_platform_id id);
-    std::string get_device_extensions(cl_device_id id);
-    bool is_extension_supported(const char *support_str, cl_device_id id);
-    int cl_gl_compatibility(cl_device_id id);
-
-#ifdef __APPLE__
-    const char *CL_GL_SHARING_EXT = "cl_APPLE_gl_sharing";
-#else
-    const char *CL_GL_SHARING_EXT = "cl_khr_gl_sharing";
-#endif
 };
 
 #endif  // GRAVITY_OPENCL_H

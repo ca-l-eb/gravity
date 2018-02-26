@@ -6,10 +6,10 @@
 #include <string.h>
 #include <iostream>
 
-#ifndef __APPLE__
-#include <GL/gl.h>
-#else
+#ifdef __APPLE__
 #include <OpenGL/gl.h>
+#else
+#include <GL/gl.h>
 #endif
 
 #include "shader.h"
