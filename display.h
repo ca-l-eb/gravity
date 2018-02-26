@@ -8,32 +8,31 @@ class GLDisplay
 public:
     GLDisplay(int width, int height, const char *title);
     ~GLDisplay();
-    inline int getWidth()
+
+    inline int width()
     {
-        return width;
+        return _width;
     }
-    inline int getHeight()
+
+    inline int height()
     {
-        return height;
+        return _height;
     }
-    inline int wasError()
-    {
-        return error;
-    }
-    inline bool isClosed()
+
+    inline bool is_closed()
     {
         return closed;
     }
-    bool wasResized();
+
+    bool resized();
     void clear(float r, float g, float b, float a);
     void update();
 
 private:
     SDL_Window *window;
     SDL_GLContext glContext;
-    int error;
-    int width, height;
-    bool closed, clearEnabled, fullscreen, resized;
+    int _width, _height;
+    bool closed, clear_enabled, fullscreen, _resized;
 };
 
 #endif

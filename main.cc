@@ -56,9 +56,6 @@ static void handle_args(int argc, char *argv[], int &count, float &dt, float &st
 int main(int argc, char *argv[])
 {
     GLDisplay disp(1600, 900, "Gravity");
-    if (disp.wasError()) {
-        return disp.wasError();
-    }
     printf("OpenGL version: %s\n", glGetString(GL_VERSION));
 
     auto dt = 0.00005f;
@@ -76,7 +73,7 @@ int main(int argc, char *argv[])
     auto up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::mat4 view;
 
-    auto aspect_ratio = static_cast<float>(disp.getWidth()) / disp.getHeight();
+    auto aspect_ratio = static_cast<float>(disp.width()) / disp.height();
     pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
 
     auto b = pgl.get_bodies();
@@ -86,14 +83,14 @@ int main(int argc, char *argv[])
     auto counter = 0.0f;
     auto frames = 1;
 
-    while (!disp.isClosed()) {
+    while (!disp.is_closed()) {
         auto start = std::chrono::high_resolution_clock::now();
 
         disp.clear(0.0f, 0.0f, 0.0f, 1.0f);
-        if (disp.wasResized()) {
-            aspect_ratio = static_cast<float>(disp.getWidth()) / disp.getHeight();
+        if (disp.resized()) {
+            aspect_ratio = static_cast<float>(disp.width()) / disp.height();
             pgl.set_perspective(aspect_ratio, 0.1f, 100.f);
-            glViewport(0, 0, disp.getWidth(), disp.getHeight());
+            glViewport(0, 0, disp.width(), disp.height());
         }
         // Update transformation camera
         view =

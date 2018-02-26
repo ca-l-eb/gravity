@@ -167,9 +167,6 @@ int main(int argc, char *argv[])
         std::cout << "n=" << args.count << " dt=" << args.dt << "\n";
 
         auto display = GLDisplay{1600, 900, "Gravity OpenCL"};
-        if (display.wasError()) {
-            return display.wasError();
-        }
         std::cout << "OpenGL version: " << glGetString(GL_VERSION) << "\n";
 
         physics_gl pgl{args.count, args.dt};
@@ -181,7 +178,7 @@ int main(int argc, char *argv[])
         pgl.use_shader();
         pgl.bind();
 
-        auto aspect_ratio = static_cast<float>(display.getWidth()) / display.getHeight();
+        auto aspect_ratio = static_cast<float>(display.width()) / display.height();
         pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
 
         auto camera_target = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -199,12 +196,12 @@ int main(int argc, char *argv[])
         glEnable(GL_DEPTH_TEST);
         glPointSize(2);
 
-        while (!display.isClosed()) {
+        while (!display.is_closed()) {
             display.clear(0.0f, 0.0f, 0.0f, 1.0f);
-            if (display.wasResized()) {
-                aspect_ratio = static_cast<float>(display.getWidth()) / display.getHeight();
+            if (display.resized()) {
+                aspect_ratio = static_cast<float>(display.width()) / display.height();
                 pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
-                glViewport(0, 0, display.getWidth(), display.getHeight());
+                glViewport(0, 0, display.width(), display.height());
             }
             if (c.is_gl_context()) {
                 c.acquire_gl_object();
