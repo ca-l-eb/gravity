@@ -242,7 +242,7 @@ physics_cl::physics_cl(physics_gl &p, const std::string &prefered_platform) : pg
     auto error = 0;
     if (cl_gl_compatibility(device)) {
         context = get_shared_gl_context(platform, &device, &error);
-        gl_context = check_error(error, "failed to use shared OpenGL buffer");
+        gl_context = !check_error(error, "failed to use shared OpenGL buffer");
     }
 
     if (!gl_context) {

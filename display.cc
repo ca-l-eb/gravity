@@ -12,6 +12,7 @@
 #include <GL/gl.h>
 #endif
 
+#include <stdexcept>
 #include <string>
 
 #include "display.h"
@@ -43,7 +44,8 @@ GLDisplay::GLDisplay(int width, int height, const char *title) : _width{width}, 
     // Get an OpenGL context to work with
     glContext = SDL_GL_CreateContext(window);
     if (glContext == NULL) {
-        throw std::runtime_error{"could not create a OpenGL context: " + std::string{SDL_GetError()}};
+        throw std::runtime_error{"could not create a OpenGL context: " +
+                                 std::string{SDL_GetError()}};
     }
 
     glewExperimental = GL_TRUE;
