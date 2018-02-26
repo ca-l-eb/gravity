@@ -57,7 +57,16 @@ static bool check_error(cl_int err, const char *message)
         }                                                                                         \
     } while (0);
 
-static cl_device_id get_best_device(cl_platform_id platform)
+static std::string get_device_name(cl_device_id id)
+{
+    auto size = 0UL;
+    clGetDeviceInfo(id, CL_DEVICE_NAME, 0, nullptr, &size);
+    auto s = std::string(size + 1, '\0');
+    clGetDeviceInfo(id, CL_DEVICE_NAME, size, const_cast<char *>(s.data()), nullptr);
+    return s;
+}
+
+static cl_device_id get_best_device(cl_platform_id platform, const std::string &preferred_device)
 {
     auto max_compute_units = 0L;
     cl_device_id best_device;
@@ -77,17 +86,12 @@ static cl_device_id get_best_device(cl_platform_id platform)
             max_compute_units = check_compute_units;
             best_device = device;
         }
+        // If we get a matching device name, use that instead of max compute units
+        auto device_name = get_device_name(device);
+        if (!preferred_device.empty() && device_name.find(preferred_device) != std::string::npos)
+            return device;
     }
     return best_device;
-}
-
-static std::string get_device_name(cl_device_id id)
-{
-    auto size = 0UL;
-    clGetDeviceInfo(id, CL_DEVICE_NAME, 0, nullptr, &size);
-    auto s = std::string(size + 1, '\0');
-    clGetDeviceInfo(id, CL_DEVICE_NAME, size, const_cast<char *>(s.data()), nullptr);
-    return s;
 }
 
 static std::string get_platform_name(cl_platform_id id)
@@ -217,7 +221,9 @@ static cl_context get_context(cl_device_id *device, cl_int *error)
     return clCreateContext(nullptr, 1, device, nullptr, nullptr, error);
 }
 
-physics_cl::physics_cl(physics_gl &p, const std::string &prefered_platform) : pgl{p}
+physics_cl::physics_cl(physics_gl &p, const std::string &prefered_platform,
+                       const std::string &preferred_device)
+    : pgl{p}
 {
     auto platforms = get_platforms();
     if (platforms.empty())
@@ -235,7 +241,7 @@ physics_cl::physics_cl(physics_gl &p, const std::string &prefered_platform) : pg
     if (!platform)
         platform = platforms[0];
 
-    device = get_best_device(platform);
+    device = get_best_device(platform, preferred_device);
 
     std::cout << "using " << get_device_name(device) << '\n';
 

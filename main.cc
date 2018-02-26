@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 
+#include "args.h"
 #include "display.h"
 #include "physics_gl.h"
 #include "pobject.h"
@@ -31,39 +32,44 @@ static void do_physics(PBodies *b, float dt, bool *updated, bool *running)
     std::cout << "physics thread finished" << std::endl;
 }
 
-static void handle_args(int argc, char *argv[], int &count, float &dt, float &step)
+struct program_args {
+    int count;
+    float dt;
+    float camera_step;
+};
+
+static program_args parse_args(int argc, char *argv[])
 {
-    if (argc == 2) {
-        std::string fs(argv[1]);
-        step = std::stof(fs);
+    arg_parser parser{"gravity"};
+    parser.add_arg({"-n", "number of objects", 1});
+    parser.add_arg({"-dt", "time step", 1});
+    parser.add_arg({"-rot", "camera rotation speed", 1});
+    parser.add_arg({"-h", "help", 0});
+
+    parser.parse(argc, argv);
+
+    bool help = parser.find("-h").get(false);
+    if (help) {
+        parser.show_help();
+        exit(0);
     }
-    if (argc == 3) {
-        std::string is(argv[1]);
-        count = std::stoi(is);
-        std::string fs(argv[2]);
-        dt = std::stof(fs);
-    }
-    if (argc == 4) {
-        std::string is(argv[1]);
-        count = std::stoi(is);
-        std::string fs(argv[2]);
-        dt = std::stof(fs);
-        fs = std::string(argv[3]);
-        step = std::stof(fs) / 360.0f;
-    }
+
+    program_args args;
+    args.count = parser.find("-n").get(1 << 12);
+    args.dt = parser.find("-dt").get(0.00005f);
+    args.camera_step = parser.find("-rot").get(0.0f);
+
+    return args;
 }
 
 int main(int argc, char *argv[])
 {
     GLDisplay disp(1600, 900, "Gravity");
-    printf("OpenGL version: %s\n", glGetString(GL_VERSION));
+    std::cout << "OpenGL version:" << glGetString(GL_VERSION) << "\n";
 
-    auto dt = 0.00005f;
-    auto count = 1 << 11;
-    auto step = static_cast<float>(M_PI) / 300.0f;
-    handle_args(argc, argv, count, dt, step);
+    auto args = parse_args(argc, argv);
 
-    physics_gl pgl{count, dt};
+    physics_gl pgl{args.count, args.dt};
     pgl.use_shader();
     pgl.bind();
 
@@ -73,13 +79,12 @@ int main(int argc, char *argv[])
     auto up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::mat4 view;
 
-    auto aspect_ratio = static_cast<float>(disp.width()) / disp.height();
-    pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
+    pgl.set_perspective(disp.aspect_ratio(), 0.1f, 100.0f);
 
     auto b = pgl.get_bodies();
     auto updatedPosition = false;
     auto running = true;
-    std::thread physics_thread{&do_physics, b, dt, &updatedPosition, &running};
+    std::thread physics_thread{&do_physics, b, args.dt, &updatedPosition, &running};
     auto counter = 0.0f;
     auto frames = 1;
 
@@ -88,8 +93,7 @@ int main(int argc, char *argv[])
 
         disp.clear(0.0f, 0.0f, 0.0f, 1.0f);
         if (disp.resized()) {
-            aspect_ratio = static_cast<float>(disp.width()) / disp.height();
-            pgl.set_perspective(aspect_ratio, 0.1f, 100.f);
+            pgl.set_perspective(disp.aspect_ratio(), 0.1f, 100.f);
             glViewport(0, 0, disp.width(), disp.height());
         }
         // Update transformation camera
@@ -109,11 +113,11 @@ int main(int argc, char *argv[])
         }
 
         // Draw the instanced particle data
-        glDrawArraysInstanced(GL_POINTS, 0, 3 * sizeof(glm::vec3), count);
+        glDrawArraysInstanced(GL_POINTS, 0, 3 * sizeof(glm::vec3), args.count);
 
         disp.update();
         frames++;
-        counter += step;
+        counter += args.camera_step;
 
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed_us =

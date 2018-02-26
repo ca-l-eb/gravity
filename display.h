@@ -19,6 +19,11 @@ public:
         return _height;
     }
 
+    inline float aspect_ratio()
+    {
+        return static_cast<float>(_width) / _height;
+    }
+
     inline bool is_closed()
     {
         return closed;

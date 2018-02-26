@@ -7,138 +7,28 @@
 #include <map>
 #include <set>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "args.h"
 #include "physics_cl.h"
 #include "physics_gl.h"
 #include "simpleio.h"
-
-struct arg_opt {
-    std::string_view name;
-    std::string_view description;
-    int num_params;
-};
-
-bool operator<(const arg_opt &l, const arg_opt &r)
-{
-    return l.name < r.name;
-}
-
-struct parsed_opt {
-    std::string value;
-    bool empty;
-
-    template<typename T>
-    T get(T default_value)
-    {
-        if (empty)
-            return default_value;
-        return (T) value;
-    }
-};
-
-template<>
-int parsed_opt::get(int default_value)
-{
-    if (empty)
-        return default_value;
-    return std::stoi(value);
-}
-
-template<>
-float parsed_opt::get(float default_value)
-{
-    if (empty)
-        return default_value;
-    return std::stof(value);
-}
-
-template<>
-double parsed_opt::get(double default_value)
-{
-    if (empty)
-        return default_value;
-    return std::stod(value);
-}
-
-template<>
-std::string parsed_opt::get(std::string default_value)
-{
-    if (empty)
-        return default_value;
-    return value;
-}
-
-template<>
-bool parsed_opt::get(bool)
-{
-    return !empty;
-}
-
-class arg_parser
-{
-private:
-    std::set<arg_opt> arg_set;
-    std::map<arg_opt, parsed_opt> parsed_options;
-    size_t max_name_length;
-
-public:
-    void add_arg(arg_opt option)
-    {
-        arg_set.insert(option);
-        max_name_length = std::max(max_name_length, option.name.size());
-    }
-
-    void parse(int argc, char *argv[])
-    {
-        for (int i = 1; i < argc; i++) {
-            std::string_view view{argv[i]};
-            auto it = arg_set.find({view, 0});
-            if (it != arg_set.end()) {
-                int n = it->num_params;
-                parsed_opt parsed;
-                parsed.empty = false;
-                if (n-- && i + 1 < argc) {
-                    parsed.value = argv[++i];
-                }
-                parsed_options[*it] = parsed;
-            }
-        }
-    }
-
-    parsed_opt find(std::string_view param)
-    {
-        auto it = parsed_options.find({param, "", 0});
-        if (it != parsed_options.end()) {
-            return it->second;
-        }
-        return {"", true};
-    }
-
-    void show_help()
-    {
-        for (auto &option : arg_set) {
-            std::cout << "  " << std::left << std::setw(max_name_length + 2) << option.name
-                      << option.description << "\n";
-        }
-        std::cout << std::internal;
-    }
-};
 
 struct program_args {
     int count;
     float dt;
     float camera_step;
-    std::string prefered_platform;
+    std::string preferred_platform;
+    std::string preferred_device;
 };
 
 static program_args parse_args(int argc, char *argv[])
 {
-    arg_parser parser;
+    arg_parser parser{"gravity_cl"};
     parser.add_arg({"-n", "number of objects", 1});
     parser.add_arg({"-p", "preferred OpenCL platform", 1});
+    parser.add_arg({"-d", "preferred OpenCL device", 1});
     parser.add_arg({"-dt", "time step", 1});
     parser.add_arg({"-rot", "camera rotation speed", 1});
     parser.add_arg({"-h", "help", 0});
@@ -155,7 +45,8 @@ static program_args parse_args(int argc, char *argv[])
     args.count = parser.find("-n").get(1 << 12);
     args.dt = parser.find("-dt").get(0.00005f);
     args.camera_step = parser.find("-rot").get(0.0f);
-    args.prefered_platform = parser.find("-p").get<std::string>("");
+    args.preferred_platform = parser.find("-p").get<std::string>("");
+    args.preferred_device = parser.find("-d").get<std::string>("");
 
     return args;
 }
@@ -171,15 +62,12 @@ int main(int argc, char *argv[])
 
         physics_gl pgl{args.count, args.dt};
 
-        auto c = physics_cl{pgl, args.prefered_platform};
+        auto c = physics_cl{pgl, args.preferred_platform, args.preferred_device};
         c.print_platform_info();
 
         // Bind shader and use VAO so OpenGL draws correctly
         pgl.use_shader();
         pgl.bind();
-
-        auto aspect_ratio = static_cast<float>(display.width()) / display.height();
-        pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
 
         auto camera_target = glm::vec3(0.0f, 0.0f, 0.0f);
         auto up = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -191,7 +79,7 @@ int main(int argc, char *argv[])
                                   2 * cos(counter)),
                         camera_target, up);
         pgl.set_view(view);
-        pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
+        pgl.set_perspective(display.aspect_ratio(), 0.1f, 100.0f);
 
         glEnable(GL_DEPTH_TEST);
         glPointSize(2);
@@ -199,8 +87,7 @@ int main(int argc, char *argv[])
         while (!display.is_closed()) {
             display.clear(0.0f, 0.0f, 0.0f, 1.0f);
             if (display.resized()) {
-                aspect_ratio = static_cast<float>(display.width()) / display.height();
-                pgl.set_perspective(aspect_ratio, 0.1f, 100.0f);
+                pgl.set_perspective(display.aspect_ratio(), 0.1f, 100.0f);
                 glViewport(0, 0, display.width(), display.height());
             }
             if (c.is_gl_context()) {

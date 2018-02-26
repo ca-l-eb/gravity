@@ -18,7 +18,8 @@
 class physics_cl
 {
 public:
-    physics_cl(physics_gl &p, const std::string &prefered_platform);
+    physics_cl(physics_gl &p, const std::string &prefered_platform,
+               const std::string &preferred_device);
     ~physics_cl();
 
     inline bool is_gl_context()
