@@ -1,8 +1,7 @@
 #include <GL/glew.h>
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_keyboard.h>
-#include <SDL2/SDL_keycode.h>
+#include "SDL_keyboard.h"
+#include "SDL_keycode.h"
 
 #ifdef _WIN32
 #include <GL/GL.h>
