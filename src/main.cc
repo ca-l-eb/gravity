@@ -64,10 +64,10 @@ static program_args parse_args(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+    auto args = parse_args(argc, argv);
+
     GLDisplay disp(1600, 900, "Gravity");
     std::cout << "OpenGL version:" << glGetString(GL_VERSION) << "\n";
-
-    auto args = parse_args(argc, argv);
 
     physics_gl pgl{args.count, args.dt};
     pgl.use_shader();

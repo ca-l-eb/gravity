@@ -1,4 +1,5 @@
 #include <fstream>
+#include <stdexcept>
 
 #include "simpleio.h"
 
@@ -9,6 +10,9 @@
 std::string read_file(const char *filename)
 {
     auto fs = std::ifstream{filename};
+    if (!fs) {
+        throw std::runtime_error{"Could not open file: " + std::string{filename}}; 
+    }
     std::string contents;
 
     fs.seekg(0, std::ios::end);
