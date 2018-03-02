@@ -77,7 +77,10 @@ private:
     size_t max_name_length;
 
 public:
-    arg_parser(std::string_view program_description) : description{program_description} {}
+    arg_parser(std::string_view program_description)
+        : description{program_description}, max_name_length{0}
+    {
+    }
 
     inline void add_arg(arg_opt option)
     {
