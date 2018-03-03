@@ -35,6 +35,7 @@ struct program_args {
     int count;
     float dt;
     float camera_step;
+    int point_size;
 };
 
 static program_args parse_args(int argc, char *argv[])
@@ -44,6 +45,7 @@ static program_args parse_args(int argc, char *argv[])
     parser.add_arg({"-dt", "time step", 1});
     parser.add_arg({"-rot", "camera rotation speed", 1});
     parser.add_arg({"-h", "help", 0});
+    parser.add_arg({"-ps", "particle point size", 1});
 
     parser.parse(argc, argv);
 
@@ -57,6 +59,7 @@ static program_args parse_args(int argc, char *argv[])
     args.count = parser.find("-n").get(1 << 12);
     args.dt = parser.find("-dt").get(0.00005f);
     args.camera_step = parser.find("-rot").get(0.0f);
+    args.point_size = parser.find("-ps").get(1);
 
     return args;
 }
@@ -65,14 +68,14 @@ int main(int argc, char *argv[])
 {
     auto args = parse_args(argc, argv);
 
-    GLDisplay disp(1600, 900, "Gravity");
+    auto disp = GLDisplay{1600, 900, "Gravity"};
     std::cout << "OpenGL version:" << glGetString(GL_VERSION) << "\n";
 
-    physics_gl pgl{args.count, args.dt};
+    auto pgl = physics_gl{args.count, args.dt};
     pgl.use_shader();
     pgl.bind();
 
-    glPointSize(2);
+    glPointSize(args.point_size);
 
     auto cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
     auto up = glm::vec3(0.0f, 1.0f, 0.0f);

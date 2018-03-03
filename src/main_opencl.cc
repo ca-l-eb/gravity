@@ -21,6 +21,7 @@ struct program_args {
     float camera_step;
     std::string preferred_platform;
     std::string preferred_device;
+    int point_size;
 };
 
 static program_args parse_args(int argc, char *argv[])
@@ -32,6 +33,7 @@ static program_args parse_args(int argc, char *argv[])
     parser.add_arg({"-dt", "time step", 1});
     parser.add_arg({"-rot", "camera rotation speed", 1});
     parser.add_arg({"-h", "help", 0});
+    parser.add_arg({"-ps", "particle point size", 1});
 
     parser.parse(argc, argv);
 
@@ -47,6 +49,7 @@ static program_args parse_args(int argc, char *argv[])
     args.camera_step = parser.find("-rot").get(0.0f);
     args.preferred_platform = parser.find("-p").get<std::string>("");
     args.preferred_device = parser.find("-d").get<std::string>("");
+    args.point_size = parser.find("-ps").get(1);
 
     return args;
 }
@@ -60,10 +63,9 @@ int main(int argc, char *argv[])
         auto display = GLDisplay{1600, 900, "Gravity OpenCL"};
         std::cout << "OpenGL version: " << glGetString(GL_VERSION) << "\n";
 
-        physics_gl pgl{args.count, args.dt};
-
-        auto c = physics_cl{pgl, args.preferred_platform, args.preferred_device};
-        c.print_platform_info();
+        auto pgl = physics_gl{args.count, args.dt};
+        auto pcl = physics_cl{pgl, args.preferred_platform, args.preferred_device};
+        pcl.print_platform_info();
 
         // Bind shader and use VAO so OpenGL draws correctly
         pgl.use_shader();
@@ -82,7 +84,7 @@ int main(int argc, char *argv[])
         pgl.set_perspective(display.aspect_ratio(), 0.1f, 100.0f);
 
         glEnable(GL_DEPTH_TEST);
-        glPointSize(2);
+        glPointSize(args.point_size);
 
         while (!display.is_closed()) {
             display.clear(0.0f, 0.0f, 0.0f, 1.0f);
@@ -90,24 +92,24 @@ int main(int argc, char *argv[])
                 pgl.set_perspective(display.aspect_ratio(), 0.1f, 100.0f);
                 glViewport(0, 0, display.width(), display.height());
             }
-            if (c.is_gl_context()) {
-                c.acquire_gl_object();
+            if (pcl.is_gl_context()) {
+                pcl.acquire_gl_object();
 
                 // Update the positions while OpenCL has acquired the OpenGL buffers
-                c.apply_gravity();
-                c.update_positions();
+                pcl.apply_gravity();
+                pcl.update_positions();
 
-                c.release_gl_object();
+                pcl.release_gl_object();
             } else {
                 // Else context is not OpenGL shared buffer, we need to read the data back, then
                 // write it back to OpenGL to display the updated positions of the particles
-                c.apply_gravity();
-                c.update_positions();
-                c.write_position_data();
+                pcl.apply_gravity();
+                pcl.update_positions();
+                pcl.write_position_data();
 
                 pgl.update_positions();
             }
-            c.finish();
+            pcl.finish();
 
             // Update the camera
             counter += args.camera_step;
